@@ -1,0 +1,406 @@
+---
+title: "Tenth Week: Principal Component Analysis and Factor Analysis"
+subtitle: "PCA Stock, image, ..."
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+
+> <p dir="RTL"> 
+با استفاده از داده های OHLCV شرکت های تشکیل دهنده شاخص s&p500 و همچنین داده مربوط به شاخص های اقتصادی به سوالات زیر پاسخ دهید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. چه شرکتی رکورددار کسب بیشترین سود در بازه یکساله، دو ساله و پنج ساله می باشد؟ این سوال را برای بخش های مختلف مورد مطالعه قرار دهید و رکورددار را معرفی کنید. (برای این کار به ستون sector داده constituents مراجعه کنید.) برای هر دو قسمت نمودار سود ده شرکت و یا بخش برتر را رسم نمایید.
+</p>
+
+<h3 dit = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+require(lubridate)
+library(xts)
+library(highcharter)
+
+# name = list.files("../class_data/stock_dfs/")
+# textpath = list.files("../class_data/stock_dfs/", full.names = T)
+# 
+# data = read_csv(textpath[1]) 
+# data %>% 
+#   mutate(symbol = name[1] %>% str_replace(".csv", "")) -> data
+# 
+# for (i in 2:length(name)) {
+#   d = read_csv(textpath[i])
+#   d %>% 
+#     mutate(symbol = name[i] %>% str_replace(".csv", "")) -> d
+#   rbind(data, d) -> data
+# }
+# write_csv(data, "data.csv")
+
+#constituents_sector = read_csv("../class_data/constituents.csv") %>% select(Symbol, Sector)
+
+# data %>% 
+#   group_by(symbol) %>% 
+#   mutate(sector = ifelse(is.na(getSymbol(symbol)), NA, constituents_sector[which(constituents_sector$Symbol == getSymbol(symbol)),]$Sector)) ->
+#   data_with_sector
+
+# getSymbol = function(symb){
+#   if(symb[1] %in% constituents_sector$Symbol){
+#     print(symb[1])
+#     return(symb[1])  
+#   }
+#   else{
+#     print(symb[1])
+#     return(NA)
+#   }
+# }
+
+# data_with_sector %>% 
+#   mutate(year = year(Date)) -> data_with_sector
+
+# write_csv(data_with_sector, "data_with_sector.csv")
+
+data_with_sector = read_csv("data_with_sector.csv")
+
+get_best_profit <- function(Date, d, year_cnt){
+  xts(d, Date) -> series
+  to.period(series, 'years', year_cnt) -> annual
+  ((annual$series.Close - annual$series.Open)/(annual$series.Open) * 100) %>% max(na.rm = T) -> max_profit
+  return(max_profit)
+}
+
+data_with_sector %>%
+  group_by(symbol, sector) %>% 
+  summarise(best_annual_profit = get_best_profit(Date, `Adj Close`, 1),
+            best_2year_profit = get_best_profit(Date, `Adj Close`, 2),
+            best_5year_profit = get_best_profit(Date, `Adj Close`, 5)) -> max_profits_per_company
+
+max_profits_per_company %>% 
+  arrange(desc(best_annual_profit)) %>% 
+  head(10) %>% 
+  hchart(type = "column", hcaes(x = symbol, y = best_annual_profit)) %>%  hc_title(text = "best annual profit")
+
+max_profits_per_company %>% 
+  arrange(desc(best_2year_profit)) %>% 
+  head(10) %>% 
+  hchart(type = "column", hcaes(x = symbol, y = best_2year_profit)) %>%  hc_title(text = "best 2 year profit")
+
+max_profits_per_company %>% 
+  arrange(desc(best_5year_profit)) %>% 
+  head(10) %>% 
+  hchart(type = "column", hcaes(x = symbol, y = best_5year_profit)) %>%  hc_title(text = "best 5 year profit")
+max_profits_per_company %>% 
+  group_by(sector) %>% 
+  summarise(annual_profit = sum(best_annual_profit),
+            two_year_profit = sum(best_2year_profit),
+            five_year_profit = sum(best_5year_profit)) -> max_profit_per_sector
+max_profit_per_sector = max_profit_per_sector %>% slice(1:11)
+
+max_profit_per_sector %>% 
+  arrange(desc(annual_profit)) %>% 
+  hchart(type = "column", hcaes(x = sector, y = annual_profit)) %>% hc_title(text = "annual profit per sector")
+
+max_profit_per_sector %>% 
+  arrange(desc(two_year_profit)) %>% 
+  hchart(type = "column", hcaes(x = sector, y = two_year_profit)) %>% hc_title(text = "two year profit per sector")
+
+max_profit_per_sector %>% 
+  arrange(desc(five_year_profit)) %>% 
+  hchart(type = "column", hcaes(x = sector, y = five_year_profit)) %>% hc_title(text = "five year profit per sector")
+
+```
+
+<p dir = "RTL">
+با استفاده از قسمت های کامنت شده می توان داده مناسب برای پاسخ سوال را به دست آورد که به دلیل حجم داده این داده تحت عنوان data_with_score نوشته شده است و از آن استفاده می شود.
+</p>
+***
+
+<p dir="RTL">
+۲. یک اعتقاد خرافی می گوید خرید سهام در روز سیزدهم ماه زیان آور است. این گزاره را مورد ارزیابی قرار دهید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+```{r, message=FALSE, warning=FALSE}
+data = read_csv("data.csv")
+data %>%
+  group_by(symbol) %>% 
+  arrange(Date) %>% 
+  mutate(next_day_adj_close = lead(`Adj Close`, 1)) %>%
+  mutate(day_profit = (next_day_adj_close - `Adj Close`)/(`Adj Close`)*100) %>% 
+  mutate(day = day(Date)) %>%
+  ungroup() %>% 
+  select(day, day_profit) -> day_profit_data
+day_profit_data %>% 
+  group_by(day) %>% 
+  summarise(mean = mean(day_profit, na.rm = T)) %>%
+  hchart(type = "column", hcaes(x = day, y = mean))
+
+t.test((day_profit_data %>% filter(day == 13))$day_profit,
+       (day_profit_data %>% filter(day != 13))$day_profit, alternative = "less")
+```
+
+<p dir = "RTL">
+اگر میانگین سود روزانه را برای روزهای مختلف با استفاده از نمودار مقایسه کنیم، میتوان دید که ۱۳ ام بدترین روز نیست. هم چنین با استفاده از t.test می توان روز سیزدهم را با بقیه روز ها از این نظر که این روز بدتر است یا خیر مقایسه کرد و طبق این تست نمی توان نتیجه گرفت که بدتر است.
+</p>
+***
+
+<p dir="RTL">
+۳. رکورد بیشترین گردش مالی در تاریخ بورس برای چه روزی بوده است و چرا!!!
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+data %>% 
+  mutate(ex = Volume*(High - Low)) %>% 
+  group_by(Date) %>% 
+  summarise(date_ex = sum(ex)) %>% 
+  arrange(desc(date_ex)) %>% head(1)
+```
+
+<p dir = "RTL">
+پاسخ مصادف با ۱۰ اکتبر ۲۰۰۸ است که همان روز بحران اقتصادی جهانی است.
+</p>
+***
+
+<p dir="RTL">
+۴. شاخص AAPL که نماد شرکت اپل است را در نظر بگیرید. با استفاده از رگرسیون خطی یک پیش کننده قیمت شروع (open price) بر اساس k روز قبل بسازید. بهترین انتخاب برای k چه مقداری است؟ دقت پیش بینی شما چقدر است؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r,message=FALSE, warning=FALSE}
+data %>% filter(symbol == "AAPL") %>% arrange(Date) %>% select(Open) -> data_apple
+
+index = sample(x= 1:nrow(data_apple),size = 0.8*nrow(data_apple),replace = F)
+
+for (k in 1:10) {  
+  c_name = paste0("open_", k)
+  data_apple %>% 
+    mutate(!!c_name := lag(Open, k)) -> data_apple
+  
+  train = data_apple[index,] 
+  test =  data_apple[-index,]  
+  model_lm = lm(Open ~. ,data = train)
+  # prediction
+  train$prediction = predict( model_lm, newdata = train, type = "response" )
+  test$prediction  = predict( model_lm, newdata = test , type = "response" )
+  
+  test %>% 
+    mutate(residual_square = (prediction - Open)^2) -> test_residual
+  residual = mean(test_residual$residual_square, na.rm = T)
+  print(residual)
+}
+```
+<p dir = "RTL">
+برای k های مختلف اردر یکسان است. 
+با نمونه گیری های متفاوت خطا میزان زیادی تغییر می کند ولی اردر برای k های مختلف یکسان است پ همچنین k خاصی وجود ندارد که همواره خطای کمتری داشته باشد.
+</p>
+***
+<p dir="RTL">
+۵. بر روی داده های قیمت شروع شرکت ها الگوریتم pca را اعمال کنید. نمودار تجمعی درصد واریانس بیان شده در مولفه ها را رسم کنید. سه مولفه اول چند درصد از واریانس را تبیین می کند؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+data %>% 
+  select(Date, Open, symbol) %>% spread(symbol, Open) -> data_open
+
+pca = prcomp(data_open %>% select(-Date) %>% na.omit())
+
+plot(summary(pca)$importance[3,], type="l",
+     ylab="%variance explained", xlab="nth component (decreasing order)")
+abline(h=0.8719,col="red");abline(v = 3,col="red",lty=3)
+
+vars = pca$sdev^2
+sum(vars[1:3])/sum(vars)
+```
+
+***
+
+<p dir="RTL">
+۶. برای هر نماد اطلاعات بخش مربوطه را از داده constituents استخراج نمایید. برای هر بخش میانگین روزانه قیمت شروع شرکت های آن را محاسبه کنید. سپس با استفاده از میانگین به دست آمده  داده ایی با چند ستون که هر ستون یک بخش و هر سطر یک روز هست بسازید. داده مربوط را با داده شاخص های اقتصادی ادغام کنید. بر روی این داده pca بزنید و نمودار biplot آن را تفسیر کنید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+data_with_sector = read_csv("data_with_sector.csv") 
+
+data_with_sector %>% 
+  group_by(Date, sector) %>% 
+  summarise(open = mean(Open)) %>% spread(sector, open) %>% ungroup() -> data_open_sector
+
+data_open_sector[,ncol(data_open_sector)] <- NULL 
+
+
+pca = prcomp(data_open_sector %>% select(-Date) %>% na.omit(), scale. = TRUE)
+library(ggbiplot)
+ggbiplot(pca, obs.scale = 1, var.scale = 1, ellipse = TRUE, circle = TRUE, alpha = 0.3) +
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top')
+```
+
+<p dir = "RTL">
+telecommunication services
+و
+finance
+مانند بقیه عمل نمی کنند. اما
+بقیه شبیه به هم هستند.
+هم چنین
+ضرب داخلی همه بخش ها مثبت است بنابراین 
+اگر قیمت سهام شرکت های یک بخش زیاد شود قیمت بقیه بخش ها نیز زیاد می شود.
+</p>
+***
+
+<p dir="RTL">
+۷. روی همه اطلاعات (OHLCV) سهام اپل الگوریتم PCA را اعمال کنید. سپس از مولفه اول برای پیش بینی قیمت شروع سهام در روز آینده استفاده کنید. به سوالات سوال ۴ پاسخ دهید. آیا استفاده از مولفه اول نتیجه بهتری نسبت به داده open price برای پیش بینی قیمت دارد؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+data %>% filter(symbol == "AAPL") %>% arrange(Date) -> data_apple
+
+pca7 = prcomp(data_apple %>% select(-Date, -symbol), scale. = T)
+
+pca7$x %>% as.data.frame() %>%  select(PC1)-> pca_data_apple
+
+data_apple %>% 
+  mutate(PC1 = pca_data_apple$PC1) %>% select(Open, PC1) -> pca_data_apple
+ 
+index = sample(x= 1:nrow(pca_data_apple),size = 0.8*nrow(pca_data_apple),replace = F)
+
+for (k in 1:10) {  
+  c_name = paste0("PC1_", k)
+  pca_data_apple %>% 
+    mutate(!!c_name := lag(PC1, k)) -> pca_data_apple
+  
+  train = pca_data_apple[index,] 
+  test =  pca_data_apple[-index,]  
+  model_lm = lm(Open ~. - PC1,data = train)
+  # prediction
+  train$prediction = predict( model_lm, newdata = train, type = "response" )
+  test$prediction  = predict( model_lm, newdata = test , type = "response" )
+  
+  test %>% 
+    mutate(residual_square = (prediction - Open)^2) -> test_residual
+  residual = mean(test_residual$residual_square, na.rm = T)
+  print(residual)
+}
+```
+
+<p dir = "RTL">
+باز هم k های مختلف شبیه به هم هستند اما خطا با این معیار بدتر است و معیار سوال ۴ مناب تر است.
+</p>
+
+***
+
+<p dir="RTL">
+۸. نمودار سود نسبی شاخص s&p500 را رسم کنید. آیا توزیع سود نرمال است؟(از داده indexes استفاده کنید.)
+با استفاده از ده مولفه اول سوال پنج آیا می توانید سود و ضرر شاخص s&p500 را برای روز آينده پیش بینی کنید؟ از یک مدل رگرسیون لاجستیک استفاده کنید. درصد خطای پیش بینی را به دست آورید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+indexes = read_csv("../class_data/indexes.csv")
+
+indexes %>% 
+  mutate(sp_diff = SP500 - lag(SP500)) %>% 
+  na.omit() -> indexes_with_sp
+
+indexes_with_sp %>% 
+  ggplot(aes(x = sp_diff)) + geom_histogram(fill = "cyan", bins = 150)
+
+shapiro.test((indexes_with_sp)$sp_diff)
+
+```
+
+
+***
+
+<p dir="RTL"> 
+۹. عکسی که در ابتدای متن آمده را در نظر بگیرید. با استفاده از pca عکس را فشرده کنید. سپس نمودار حجم عکس فشرده بر حسب تعداد مولفه اصلی را  رسم کنید. بهترین انتخاب برای انتخاب تعداد مولفه ها در جهت فشرده سازی چه عددی است؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+library("EBImage")
+pic = flip(readImage("../hw_09/images/stock.jpg"))
+red.weigth   = .2989; green.weigth = .587; blue.weigth  = 0.114
+img = red.weigth * imageData(pic)[,,1] +
+  green.weigth * imageData(pic)[,,2] + blue.weigth  * imageData(pic)[,,3]
+
+pca.img = prcomp(img, scale=TRUE)
+
+images = list()
+for(n in seq(2, 100, by = 2)) {
+  chosen.components = 1:n
+  feature.vector = pca.img$rotation[,chosen.components]
+  compact.data = t(feature.vector) %*% t(img)
+  images[[n]] = t(feature.vector %*% compact.data) 
+}
+for (n in seq(2, 100, by = 2)) {
+  jpeg(paste0("simg", as.character(n), ".jpg"))
+  image(images[[n]], col = grey(seq(0, 1, length = 256)))
+  dev.off()
+}
+
+img.size = data.frame()
+for (n in seq(2, 100, by = 2)) {
+  #print(file.info(paste0("simg", as.character(n), ".jpg"))$size )
+  rbind(img.size, data.frame(size = file.info(paste0("simg", as.character(n), ".jpg"))$size, PCAcomp = n)) -> img.size
+}
+
+img.size %>% 
+  ggplot(aes(x = PCAcomp, y = size)) + geom_line(col = "tomato")
+
+img.size %>% 
+  arrange(size) %>% head(5)
+```
+
+***
+
+<p dir="RTL"> 
+۱۰. پنج ایده جالبی که روی داده های مالی بالا می توانستیم پیاده کنیم را بیان کنید. (ایده کافی است نیازی به محاسبه بر روی داده نیست.)
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+<p dir = "RTL">
+۱- بیشترین تغییر قیمت در یک روز
+۲- با ثبات ترین قیمت اپن در یک بازه (شرکتی که دارای این ثبات است.)
+۳- شرکت هایی که سهامشان به هم مرتبط است یعنی با هم قیمتشان زیاد یا کم می شود.
+۴- شرکت هایی که بیشترین تغییر رتبه از نظر سود سالیانه را در دوسال متوالی داشته اند.
+۵- شرکتی که سهام آن از شرکت های دیگر پر ارزش تر است.
+۶- رتبه بندی بخش ها از نظر مجموع سهام شرکت هایشان
+</p>

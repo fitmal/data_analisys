@@ -1,0 +1,638 @@
+---
+title: "Eighth Week: Text Analysis in R"
+subtitle: "To be, or not to be"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+> <p dir="RTL"> 
+با استفاده از بسته gutenberg داده های لازم را به دست آورید و به سوالات زیر پاسخ دهید.
+</p>
+
+***
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gutenbergr)
+library(stringr)
+library(tidytext)
+library(tm)
+library(wordcloud)
+library(highcharter)
+library(devtools)
+library(wordcloud2)
+
+#Dickens_books = gutenberg_download(c(580, 730, 967, 700, 917, 968, 821, 766, 1023, 786, 963, 98, 1400, 883, 564), meta_fields = "title")
+#Les_Misérables = gutenberg_download(135)
+
+#write.csv(Dickens_books, "../week8/ans8/Dickens_books.csv")
+#write.csv(Les_Misérables, "../week8/ans8/Les_Miserable.csv")
+Dickens_books = read.csv("Dickens_books.csv")
+Les_Misérables = read.csv("Les_Miserable.csv")
+
+Dickens_books$text -> lines
+```
+
+
+<p dir="RTL">
+۱. چارلز دیکنز نویسنده معروف انگلیسی بالغ بر چهارده رمان (چهارده و نیم) نوشته است. متن تمامی کتاب های او را دانلود کنید و سپس بیست لغت برتر استفاده شده را به صورت یک نمودار ستونی نمایش دهید. (طبیعتا باید ابتدا متن را پاکسازی کرده و stopping words را حذف نمایید تا به کلماتی که بار معنایی مشخصی منتقل می کنند برسید.)
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+words_Dickends_books = lines %>% 
+  str_replace_all("\"", "") %>% 
+  str_replace_all("[[:punct:]]", " ") %>% 
+  str_to_lower() %>% 
+  str_split(pattern = "\\s") %>% 
+  unlist() %>% 
+  table() %>% 
+  as.data.frame(stringsAsFactors = F)
+colnames(words_Dickends_books) = c("word", "count")
+
+words_Dickends_books %>%
+  filter(!str_to_lower(word) %in% stop_words$word) %>% 
+  filter(str_length(word) > 2) %>% 
+  filter(!str_detect(word, "\\d")) %>% 
+  filter(!word %in% stopwords(kind = "fr")) %>% 
+  arrange(desc(count)) -> most_repeated_words
+most_repeated_words %>% 
+  head(20) %>% 
+  hchart(type = "column", hcaes(x = word, y = count))
+```
+
+***
+
+<p dir="RTL">
+۲. ابر لغات ۲۰۰ کلمه پرتکرار در رمان های چارلز دیکنز را رسم نمایید. این کار را با بسته wordcloud2 انجام دهید. برای دانلود می توانید به لینک زیر مراجعه کنید.
+</p>
+
+https://github.com/Lchiffon/wordcloud2
+
+<p dir="RTL">
+ با استفاده از عکسی که در ابتدا متن آمده ابر لغاتی مانند شکل زیر رسم کنید. (راهنمایی: از ورودی figpath در دستور wordcloud2 استفاده نمایید.مثالی در زیر آورده شده است.)
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+most_repeated_words %>% 
+  head(200) %>% 
+  rename(freq = count) %>% 
+  wordcloud2(size = 0.35,figPath = "../hw_08/images/dickens1_1.png")
+```
+
+<p dir = "RTL">
+این قسمت در RMD لود نمی شود اما در خود R می توان با زدن این کد worldcloud را مشاهده کرد.
+</p>
+***
+
+<p dir="RTL">
+۳. اسم پنج شخصیت اصلی در هر رمان دیکنز را استخراج کنید و با نموداری تعداد دفعات تکرار شده بر حسب رمان را رسم نمایید. (مانند مثال کلاس در رسم اسامی شخصیت ها در سری هر پاتر)
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+id = c(580, 730, 967, 700, 917, 968, 821, 766, 1023, 786, 963, 98, 1400, 883, 564)
+dickensList = list()
+for (i in 1:15) {
+  book = Dickens_books %>% 
+          filter(gutenberg_id == id[i])
+  lines = book$text
+  words = lines %>% 
+    str_replace_all("\"", "") %>% 
+    str_replace_all("[[:punct:]]", " ") %>% 
+    str_split(pattern = "\\s") %>% 
+    unlist() %>% 
+    table() %>% 
+    as.data.frame(stringsAsFactors = F)
+  colnames(words) = c("word", "count")
+  
+  words = words %>% 
+    filter(!str_to_lower(word) %in% stop_words$word) %>% 
+    filter(str_length(word) > 1) %>% 
+    filter(!str_detect(word, "\\d")) %>% 
+    arrange(desc(count)) %>% 
+    filter(!str_to_lower(word) %in% word) %>% 
+    mutate(book_no = id[i]) %>% 
+    head(5) -> dickensList[[i]]
+}
+
+data2 = bind_rows(dickensList)
+f <- function(i){
+  data2 %>% 
+    filter(book_no == id[i]) %>%
+    hchart("column", hcaes(x = word, y = count))
+}
+charts = list()
+for (i in 1:15) {
+    charts[[i]] = f(i)
+}
+
+htmltools::tagList(charts)
+
+
+
+
+```
+
+***
+
+<p dir="RTL">
+۴.  در بسته tidytext داده ایی به نام sentiments وجود دارد که فضای احساسی لغات را مشخص می نماید. با استفاده از این داده نمودار ۲۰ لغت برتر negative و ۲۰ لغت برتر positive را در کنار هم رسم نمایید. با استفاده از این نمودار فضای حاکم بر داستان چگونه ارزیابی می کنید؟ (به طور مثال برای کتاب داستان دو شهر فضای احساسی داستان به ترتیب تکرر در نمودار زیر قابل مشاهده است.)
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+sentiments %>% 
+  select(word, sentiment) %>% 
+  distinct(word, sentiment) %>% 
+  filter(sentiment == "positive" | sentiment == "negative") -> neg_pos_sentiments
+
+id = c(580, 730, 967, 700, 917, 968, 821, 766, 1023, 786, 963, 98, 1400, 883, 564)
+dickensList = list()
+
+charts = list()
+func <- function(i){
+  book = Dickens_books %>% 
+    filter(gutenberg_id == id[i])
+  name = (gutenberg_metadata %>% 
+    filter(gutenberg_id == id[i]))$title
+  lines = book$text
+  words = lines %>% 
+    str_replace_all("\"", "") %>% 
+    str_replace_all("[[:punct:]]", " ") %>% 
+    str_to_lower() %>% 
+    str_split(pattern = "\\s") %>% 
+    unlist() %>% 
+    table() %>% 
+    as.data.frame(stringsAsFactors = F)
+  colnames(words) = c("word", "count")
+  
+  words %>% 
+    filter(!str_to_lower(word) %in% stop_words$word) %>% 
+    filter(str_length(word) > 2) %>% 
+    filter(!str_detect(word, "\\d")) %>% 
+    filter(word %in% neg_pos_sentiments$word) -> neg_pos_words
+  
+  neg_pos_words %>% 
+    mutate(sentiment = "0") -> neg_pos_words
+  
+  for (w in neg_pos_words$word) {
+    if(length(neg_pos_sentiments$sentiment[which(neg_pos_sentiments$word == w)]) == 1){
+      neg_pos_words$sentiment[which(neg_pos_words$word == w)] = 
+      neg_pos_sentiments$sentiment[which(neg_pos_sentiments$word == w)]
+    }
+  }
+  
+  neg_pos_words %>% 
+    filter(sentiment == "positive") %>% 
+    arrange(desc(count)) %>% 
+    head(20) -> top_20_positive
+    
+  neg_pos_words %>% 
+    filter(sentiment == "negative") %>% 
+    arrange(desc(count)) %>% 
+    head(20) -> top_20_negative
+  
+  rbind(top_20_negative, top_20_positive) %>% 
+      hchart(type = "column", hcaes(x = word, y = count, color = sentiment)) %>% hc_title(text = name) ->> charts[[(2*i) - 1]]
+  
+  charts[[2*i]] <<- data.frame(sentiment = c('positive', 'negative'),
+                               sum = c(top_20_positive$count %>% sum , top_20_negative$count %>% sum)) %>% 
+      hchart(type = "pie", hcaes(name = sentiment, y = sum)) %>% hc_title(text = name)
+  
+  
+}
+
+
+
+for (i in 1:15) {
+    func(i)
+}
+
+htmltools::tagList(charts)
+
+
+```
+
+***
+
+<p dir="RTL">
+۵. متن داستان بینوایان را به ۲۰۰ قسمت مساوی تقسیم کنید. برای هر قسمت تعداد لغات positive و negative را حساب کنید و سپس این دو سری زمانی را در کنار هم برای مشاهده فضای احساسی داستان رسم نمایید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+
+nrow(Les_Misérables)
+step = 67000/200
+positives_count = c()
+negatives_count = c()
+for (i in 1:200) {
+  if(i != 200){
+    part = Les_Misérables %>% 
+            slice(((i - 1)*step + 1) : (((i - 1)*step + 1) + step - 1))
+  } else {
+    part = Les_Misérables %>% 
+      slice(67001 : 67273)
+  }
+  
+  lines = part$text
+  words = lines %>% 
+    str_replace_all("\"", "") %>% 
+    str_replace_all("[[:punct:]]", " ") %>% 
+    str_to_lower() %>% 
+    str_split(pattern = "\\s") %>% 
+    unlist() %>% 
+    table() %>% 
+    as.data.frame(stringsAsFactors = F)
+  colnames(words) = c("word", "count")
+  
+  words %>% 
+    filter(!str_to_lower(word) %in% stop_words$word) %>% 
+    filter(str_length(word) > 2) %>% 
+    filter(!str_detect(word, "\\d")) %>% 
+    filter(word %in% neg_pos_sentiments$word) -> neg_pos_words
+  
+  neg_pos_words %>% 
+    mutate(sentiment = "0") -> neg_pos_words
+  
+  for (w in neg_pos_words$word) {
+    if(length(neg_pos_sentiments$sentiment[which(neg_pos_sentiments$word == w)]) == 1){
+      neg_pos_words$sentiment[which(neg_pos_words$word == w)] = 
+        neg_pos_sentiments$sentiment[which(neg_pos_sentiments$word == w)]
+    }
+  }
+  
+  neg_pos_words %>% 
+    filter(sentiment == "positive") %>% 
+    arrange(desc(count)) -> positives
+  
+  neg_pos_words %>% 
+    filter(sentiment == "negative") %>% 
+    arrange(desc(count)) -> negatives
+  
+  positives_count = c(positives_count, positives$count %>% sum())
+  negatives_count = c(negatives_count, negatives$count %>% sum())
+}
+
+highchart() %>% 
+  hc_add_series(data.frame(x = 1:200, y = positives_count),type = "line",hcaes(x = x, y = y), name = "positive") %>% 
+  hc_add_series(data.frame(x = 1:200, y = negatives_count),type = "line",hcaes(x = x, y = y), name = "negative") 
+```
+
+***
+
+<p dir="RTL">
+۶. ابتدا ترکیبات دوتایی کلماتی که پشت سر هم می آیند را استخراج کنید و سپس نمودار ۳۰ جفت لغت پرتکرار را رسم نمایید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning= FALSE}
+Les_Misérables %>% 
+  select(text) -> lines
+lines %>% 
+  str_replace_all("\"", "") %>% 
+  str_replace_all("[[:punct:]]", " ") %>% 
+  str_to_lower() %>% 
+  str_extract_all("\\w+\\s\\w+") %>%   
+  table() %>% 
+  as.data.frame(stringsAsFactors = F) -> words_1
+
+lines$text %>% 
+  str_replace_all("\"", "") %>% 
+  str_replace_all("[[:punct:]]", " ") %>% 
+  str_to_lower() %>% 
+  str_extract_all("\\s\\w+\\s\\w+") %>% 
+  unlist() %>% 
+  str_sub(2) %>%
+  table() %>% 
+  as.data.frame(stringsAsFactors = F) -> words_2
+
+rbind(words_1, words_2) -> Les_Misérables_words
+colnames(Les_Misérables_words) = c("word", "count")
+
+Les_Misérables_words %>% 
+  group_by(word) %>% 
+  summarise(freq = sum(count)) -> Les_Misérables_words
+
+Les_Misérables_words %>%
+  group_by(word) %>% 
+  filter((!(str_split(word,pattern = "\\s") %>% unlist() %>% .[1] %in% stop_words$word))) %>% 
+  filter((!(str_split(word,pattern = "\\s") %>% unlist() %>% .[2] %in% stop_words$word))) %>% 
+  filter((!str_detect(word, "\\d"))) %>% 
+  filter((!(str_split(word,pattern = "\\s") %>% unlist() %>% .[1] %in% stopwords(kind = "fr")))) %>% 
+  filter((!(str_split(word,pattern = "\\s") %>% unlist() %>% .[2] %in% stopwords(kind = "fr")))) -> pairs_Les_Miserables
+pairs_Les_Miserables %>% 
+  arrange(desc(freq)) %>% 
+  head(30) %>% 
+  hchart(type = "bar", hcaes(x = word, y = freq), colorByPoint = TRUE)  
+
+
+```
+
+***
+
+<p dir="RTL">
+۷. جفت کلماتی که با she و یا he آغاز می شوند را استخراج کنید. بیست فعل پرتکراری که زنان و مردان در داستان های دیکنز انجام می دهند را استخراج کنید و نمودار آن را رسم نمایید.
+</p>
+
+<h3 dit = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+Dickens_books %>% 
+  select(text) -> lines
+lines %>% 
+  str_replace_all("\"", "") %>% 
+  str_replace_all("[[:punct:]]", " ") %>% 
+  str_to_lower() %>% 
+  str_extract_all("\\w+\\s\\w+") %>%   
+  table() %>% 
+  as.data.frame(stringsAsFactors = F) -> words_1
+
+lines$text %>% 
+  str_replace_all("\"", "") %>% 
+  str_replace_all("[[:punct:]]", " ") %>% 
+  str_to_lower() %>% 
+  str_extract_all("\\s\\w+\\s\\w+") %>% 
+  unlist() %>% 
+  str_sub(2) %>%
+  table() %>% 
+  as.data.frame(stringsAsFactors = F) -> words_2
+
+rbind(words_1, words_2) -> Dickens_words
+colnames(Dickens_words) = c("word", "count")
+
+Dickens_words %>% 
+  group_by(word) %>% 
+  summarise(freq = sum(count)) -> Dickens_words
+Dickens_words %>% View()
+
+Dickens_words %>%
+  filter(str_detect(word, "^she\\s") | str_detect(word, "^he\\s")) %>% 
+  group_by(word) %>% 
+  filter(str_length(str_split(word,pattern = "\\s") %>% unlist() %>% .[2]) > 2) -> with_stop_word
+
+with_stop_word %>% 
+  group_by(word) %>% 
+  filter((!(str_split(word,pattern = "\\s") %>% unlist() %>% .[2] %in% stopwords(kind = "en")))) -> without_stop_word 
+
+without_stop_word %>% 
+  filter(str_detect(word, "^she\\s")) %>%
+  arrange(desc(freq)) %>% 
+  head(20) %>% 
+  mutate(verb = str_replace(word, "she\\s(.*)", "\\1")) -> she_verbs_without_sw
+she_verbs_without_sw %>% 
+  hchart(type = "column", hcaes(x = word, y = freq)) %>% hc_title(text = "she_verbs_without_sw")
+
+without_stop_word %>% 
+  filter(str_detect(word, "^he\\s")) %>%
+  arrange(desc(freq)) %>% 
+  head(20) %>% 
+  mutate(verb = str_replace(word, "he\\s(.*)", "\\1")) -> he_verbs_without_sw
+he_verbs_without_sw %>% 
+  hchart(type = "column", hcaes(x = word, y = freq)) %>% hc_title(text = "he_verbs_without_sw")
+with_stop_word %>% 
+  filter(str_detect(word, "^she\\s")) %>%
+  arrange(desc(freq)) %>% 
+  head(20) %>% 
+  mutate(verb = str_replace(word, "she\\s(.*)", "\\1")) -> she_verbs_with_sw
+she_verbs_with_sw %>% 
+  hchart(type = "column", hcaes(x = word, y = freq)) %>% hc_title(text = "she_verbs_with_sw")
+
+with_stop_word %>% 
+  filter(str_detect(word, "^he\\s")) %>%
+  arrange(desc(freq)) %>% 
+  head(20) %>% 
+  mutate(verb = str_replace(word, "he\\s(.*)", "\\1")) -> he_verbs_with_sw
+he_verbs_with_sw %>% 
+  hchart(type = "column", hcaes(x = word, y = freq)) %>% hc_title(text = "he_verbs_with_sw")
+
+```
+
+***
+
+<p dir="RTL">
+۸. برای کتاب های دیکنز ابتدا هر فصل را جدا کنید. سپی برای هر فصل 
+1-gram, 2-gram
+را استخراج کنید. آیا توزیع  N-gram
+در کارهای دیکنز یکسان است؟ با رسم نمودار هم این موضوع را بررسی کنید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+<h3 dir = "RTL">
+
+```{r, message=FALSE, warning=FALSE}
+id = c(580, 730, 967, 700, 917, 968, 821, 766, 1023, 786, 963, 98, 1400, 883, 564)
+Dickens_books = read.csv("Dickens_books.csv") 
+Dickens_books$text %>% str_trim() -> Dickens_books$text
+
+Dickens_books %>% 
+  filter(str_detect(text, regex("^[IVXL]+\\.",ignore_case = T)) | str_detect(text, regex("^chapter", ignore_case = T))) %>% 
+  filter(X != 22042) %>% 
+  filter(X != 32444) %>%
+  filter(X != 34261) %>% 
+  filter(X != 36250) %>% 
+  filter(X != 112261) %>% 
+  filter(X != 133326) %>% 
+  filter(X != 212867) %>% 
+  filter(X != 261930) %>% 
+  filter(X != 264144) %>% 
+  filter(X != 273120) %>% 
+  filter(X != 317591) %>% 
+  filter(X != 350658) %>% 
+  filter(X != 350726) %>% 
+  filter(X != 426358) -> chapters
+
+chapters %>% 
+  group_by(gutenberg_id) %>% 
+  mutate(diff = -(X - lead(X, default = X[1]))) -> chapters
+
+chapters %>% 
+  filter(abs(diff) > 20) -> correct_chapters
+
+letters_letters = c()
+for (l in letters) {
+  for (ll in letters) {
+    letters_letters = c(letters_letters, paste0(l, ll))
+  }
+}
+
+n_grams <- data.frame(matrix(ncol = 28 + (26*26), nrow = 0))
+colnames(n_grams) = c("gutenberg_id", "chapter", letters, letters_letters)
+
+for (i in 1:length(id)) {
+  book = Dickens_books %>% filter(gutenberg_id == id[i])
+  book_chapter = correct_chapters %>% filter(gutenberg_id == id[i])
+  book_chapter_index = book_chapter$X
+  book_chapter_index = c(book_chapter_index, (book %>% tail(1))$X)
+
+  for (j in 1:(length(book_chapter_index) - 1)) {
+    chapter <- book %>% filter(X >= book_chapter_index[j] & X < book_chapter_index[j + 1])
+    chapter_lines = chapter$text
+    alphabets = double()
+    for (alphabet in letters) {
+      alphabets = c(alphabets, sum(str_count(chapter_lines, alphabet), na.rm = T))
+    }
+    
+    sum = sum(alphabets)
+    for (k in 1:length(alphabets)) {
+      alphabets[k] = (alphabets[k]/sum)
+    }
+    
+    alphabets_alphabets = double()
+    for (alphabet_alphabet in letters_letters) {
+      alphabets_alphabets = c(alphabets_alphabets, sum(str_count(chapter_lines, alphabet_alphabet), na.rm = T))
+    }
+    
+    sum = sum(alphabets_alphabets)
+    for (k in 1:length(alphabets_alphabets)) {
+      alphabets_alphabets[k] = ((alphabets_alphabets[k])/sum)
+    }
+    
+    n_grams[nrow(n_grams) + 1,] = c(id[i], j, alphabets, alphabets_alphabets)
+  }
+}
+
+```
+<p dir = "RTL">
+در پایان کد بالا در n_grams فرکانس کاراکترهای تک حرفی و دو حرفی را به ازای هر فصل خواهیم داشت.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+library(data.table)
+transpose(n_grams) -> n_grams_transpose
+colnames(n_grams_transpose) <- rownames(n_grams)
+rownames(n_grams_transpose) <- colnames(n_grams)
+n_grams_transpose[-(1:2), ] -> n_grams_transpose
+```
+<p dir = "RTL">
+با استفاده از t.test می توان نشان داد که توزیع n-gram ها در کارهای دیکنز یکسان است.
+(استفاده از chisq.test مناسب تر است اما این تست p-value برابر با NA می دهد.)
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+t.test(n_grams_transpose[, 1:1], n_grams_transpose[, 2:2])
+t.test(n_grams_transpose[, 1:1], n_grams_transpose[, 50, 50])
+t.test(n_grams_transpose[, 11:11], n_grams_transpose[,  40:40])
+```
+<p dir = "RTL">
+اگر مانند بالا تعداد زیادی ستون را باهم مقایسه کنیم می توان مشاهده کرد که فصل های مختلف دارای n_grams شبیه به هم هستند.
+</p>
+
+
+***
+
+<p dir="RTL"> 
+۹. برای آثار ارنست همینگوی نیز تمرین ۸ را تکرار کنید. آیا بین آثار توزیع n-grams در بین آثار این دو نویسنده یکسان است؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+#emmaa = gutenberg_download(158)
+#write.csv(emmaa, "../week8/ans8/emmaa.csv")
+book = read.csv("emmaa.csv")
+
+book$text %>% str_trim() -> book$text
+
+book %>% 
+  filter(str_detect(text, regex("^[IVXL]+\\.",ignore_case = T)) | str_detect(text, regex("^chapter", ignore_case = T))) %>% 
+  filter(X != 6511) -> chapters
+
+chapters %>% 
+  mutate(diff = -(X - lead(X, default = X[1]))) -> chapters
+
+chapters %>% 
+  filter(abs(diff) > 20) -> correct_chapters
+
+letters_letters = c()
+for (l in letters) {
+  for (ll in letters) {
+    letters_letters = c(letters_letters, paste0(l, ll))
+  }
+}
+
+n_grams_emma <- data.frame(matrix(ncol = 27 + (26*26), nrow = 0))
+colnames(n_grams_emma) = c("chapter", letters, letters_letters)
+
+
+  
+book_chapter_index = correct_chapters$X
+book_chapter_index = c(book_chapter_index, (book %>% tail(1))$X)
+
+  for (j in 1:(length(book_chapter_index) - 1)) {
+    chapter <- book %>% filter(X >= book_chapter_index[j] & X < book_chapter_index[j + 1])
+    chapter_lines = chapter$text
+    alphabets = double()
+    for (alphabet in letters) {
+      alphabets = c(alphabets, sum(str_count(chapter_lines, alphabet), na.rm = T))
+    }
+    
+    sum = sum(alphabets)
+    for (k in 1:length(alphabets)) {
+      alphabets[k] = (alphabets[k]/sum)
+    }
+    
+    alphabets_alphabets = double()
+    for (alphabet_alphabet in letters_letters) {
+      alphabets_alphabets = c(alphabets_alphabets, sum(str_count(chapter_lines, alphabet_alphabet), na.rm = T))
+    }
+    
+    sum = sum(alphabets_alphabets)
+    for (k in 1:length(alphabets_alphabets)) {
+      alphabets_alphabets[k] = ((alphabets_alphabets[k])/sum)
+    }
+    
+    n_grams_emma[nrow(n_grams_emma) + 1,] = c(j, alphabets, alphabets_alphabets)
+  }
+#write.csv(n_grams_emma, "../week8/ans8/n_grams_emma.csv")
+```
+<p dir = "RTL">
+در n_grams_emma مونوگرام ها و بایگرام های مربوط به کتاب emma آمده اند.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+n_grams %>% slice(1:nrow(n_grams_emma)) -> part_n_grams
+n_grams_emma %>% slice(1:nrow(n_grams_emma)) -> part_n_gram_emma
+t.test(part_n_grams$a, part_n_gram_emma$a)
+t.test(part_n_grams$is, part_n_gram_emma$is)
+```
+<p dir = "RTL">
+بنابراین می توان مشاهده کرد که در بسیاری از موارد توزیع شبیه به هم است و در بعضی از موارد توزیع شبیه به هم نیست.
+هم چنین برای مقایسه بهتر می توان به ازای هر مونوگرام و بایگرام به ازای هر نویسنده میانگین را محاسبه کرد(برای مثال میانگین کاراکترهای a)
+و بردار میانگین های دو کتاب را با هم مقایسه کرد.
+</p>
+
+***
+
+<p dir="RTL"> 
+۱۰. بر اساس دادهایی که در تمرین ۸ و ۹ از آثار دو نویسنده به دست آوردید و با استفاده از  N-gram ها یک مدل لاجستیک برای تشخیص صاحب اثر بسازید. خطای مدل چقدر است؟ برای یادگیری مدل از کتاب کتاب الیور تویست اثر دیکنز و کتاب پیرمرد و دریا استفاده نکنید. پس از ساختن مدل برای تست کردن فصل های این کتابها را به عنوان داده ورودی به مدل بدهید. خطای تشخیص چقدر است؟
+</p>
+

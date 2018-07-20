@@ -1,0 +1,261 @@
+---
+title: "Create Map"
+subtitle: "Earthquake Analysis"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+> <p dir="RTL"> 
+با استفاده از داده های زلزله ها در ایران و جهان به سوالات زیر پاسخ دهید.
+</p>
+
+***
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(plotly)
+library(tidyverse)
+library(highcharter)
+library(Hmisc)
+library(ggthemes)
+library(gganimate)
+library(animation)
+library(gapminder)
+```
+
+<p dir="RTL">
+۱. با استفاده از داده های
+historical_web_data_26112015.rds 
+و استفاده از نمودار پراکنش سه بعدی بسته plotly نمودار طول، عرض و عمق زلزله ها را رسم نمایید. علاوه بر آن بزرگی هر نقطه را برابر بزرگی زمین لرزه قرار دهید.
+</p>
+
+<h3 dit = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+
+historical_web_data = read_rds("../week_11/data/historical_web_data_26112015.rds")
+
+p <- plot_ly(historical_web_data, x = ~Latitude,
+             y = ~Longitude,
+             z = ~Depth,
+             size = ~Magnitude) %>% 
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'Latitude'),
+                      yaxis = list(title = 'Longitude'),
+                      zaxis = list(title = 'Depth')))
+p
+```
+
+***
+
+<p dir="RTL">
+۲. پویانمایی سونامی های تاریخی را بر حسب شدت بر روی نقشه زمین رسم نمایید.(از داده زلزله های بزرگ استفاده نمایید.)
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+disaster = read_delim("../week_11/data/disaster.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+disaster %>% 
+  filter(FLAG_TSUNAMI == "Tsu") -> tsunami
+
+tsunami %>% 
+  filter(!is.na(INTENSITY)) %>% 
+  filter(YEAR >= 0 )-> valid_tsunami
+
+valid_tsunami %>% 
+  select(YEAR, INTENSITY, LONGITUDE, LATITUDE) -> valid_tsunami
+
+world <- ggplot() +
+  borders("world", colour = "gray85", fill = "gray80") +
+  theme_map() 
+
+map <- world +
+  geom_point(aes(x = LONGITUDE, y = LATITUDE, size = INTENSITY, frame = YEAR),
+             data = valid_tsunami, 
+             colour = 'purple', alpha = .3) +
+  scale_size_continuous(range = c(1, 8), 
+                        breaks = c(250, 500, 750, 1000)) +
+  labs(size = 'intensity')
+gganimate(map, "map.gif")
+```
+<p dir = "RTL">
+با اجرای دستورات بالا می توان انیمیشن مورد نظر سوال را به عنوان gif به دست آورد.
+با ورودی دادن map و تبدیل نکردن انیمیشن به gif در محیط R انیمیشن کشیده می شود اما در rmd خروجی بد نمایش داده می شود به همین علت خروجی gif گرفته شده است.
+</p>
+***
+
+<p dir="RTL">
+۳. نمودار چگالی دو بعدی زلزله های تاریخی ایران را رسم کنید.( از داده iran_earthquake.rds و لایه stat_density_2d استفاده نمایید).
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+iran_equake = read_rds("../week_11/data/iran_earthquake.rds")
+
+ggplot(iran_equake, aes(x=Lat, y=Long) ) +
+  geom_density_2d()
+
+```
+
+***
+
+<p dir="RTL">
+۴. احتمال اینکه در ایران در پنج سال آینده زلزله به بزرگی هفت ریشتر رخ دهد را محاسبه کنید. (از احتمال شرطی استفاده کنید.)
+</p>
+
+
+
+***
+
+<p dir="RTL">
+۵. بر اساس داده های زلزله های بزرگ ابتدا تعداد و متوسط کشته زلزله ها را بر حسب کشور استخراج نمایید. سپس نمودار گرمایی تعداد کشته ها را بر روی کره زمین رسم نمایید.(مانند مثال زیر!)
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+simpleCap <- function(x) {
+  s <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(s, 1,1)), substring(s, 2),
+        sep="", collapse=" ")
+}
+
+disaster %>% 
+  select(COUNTRY, LATITUDE, LONGITUDE, LOCATION_NAME, DEATHS) %>% 
+  group_by(COUNTRY) %>% 
+  summarise(mean = mean(DEATHS, na.rm = T), sum = sum(DEATHS, na.rm = T)) %>% 
+  arrange(desc(sum))-> disaster_countries
+disaster_countries$COUNTRY <- tolower(disaster_countries$COUNTRY)
+disaster_countries$COUNTRY <- capitalize(disaster_countries$COUNTRY)
+sapply(disaster_countries$COUNTRY, simpleCap) -> disaster_countries$COUNTRY
+
+mapdata <- get_data_from_map(download_map_data("custom/world-palestine-highres"))
+
+hcmap("custom/world-palestine-highres", data = disaster_countries, value = "sum",
+      joinBy = c("name", "COUNTRY"), name = "world_death_equake",
+      dataLabels = list(enabled = TRUE, format = '{point.name}'),
+      borderColor = "#FAFAFA", borderWidth = 0.1) %>% 
+  hc_legend(layout = "vertical", verticalAlign = "top",
+            align = "right", valueDecimals = 0) %>% 
+  hc_mapNavigation(enabled = TRUE) 
+
+```
+
+
+
+***
+
+<p dir="RTL">
+۶. با استفاده از داده لرزه های بزرگ و به وسیله طول، عرض، شدت، عمق مدلی برای پیش بینی تعداد کشته های زلزله بیابید.
+</p>
+
+```{r, message=FALSE,warning=FALSE}
+worldwide <- read_csv('../week_11/data/worldwide.csv')
+disaster %>% select(LATITUDE, LONGITUDE, INTENSITY, FOCAL_DEPTH, TOTAL_DEATHS) -> d6
+lm(TOTAL_DEATHS ~ (LATITUDE*LONGITUDE) + INTENSITY + FOCAL_DEPTH  , data = d6) -> lm
+summary(lm)
+```
+
+***
+
+<p dir="RTL">
+۷. با استفاده از داده worldwide.csv به چند سوال زیر پاسخ دهید. تحقیق کنید آیا می توان از پیش لرزه، زلزله اصلی را پیش بینی کرد؟
+</p>
+
+
+***
+
+<p dir="RTL">
+۸. گزاره " آیا شدت زلزله به عمق آن بستگی دارد" را تحقیق کنید؟ (طبیعتا از آزمون فرض باید استفاده کنید.)
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+worldwide %>% filter(type =="earthquake", magType == 'mb') -> d8
+cor.test(d8$depth, d8$mag, method = "spearman",  exact=FALSE)
+```
+<p dir = "RTL">
+بنابراین طبق مقدار p-valueمی توان نتیجه گرفت که شدت زلزله به عمق آن بستگی ندارد.
+</p>
+***
+
+<p dir="RTL"> 
+۹. میانگین سالانه زلزله ها را بر حسب کشور به دست آورید. آیا میتوان دلیلی در تایید یا رد تئوری هارپ ارائه کرد.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+library(stringr)
+library(tidyverse)
+worldwide %>%
+  filter(type == "earthquake", magType == "mb") %>%
+  mutate(country = str_extract(place , '(\\w+)$')) %>%
+  mutate(year = str_sub(time, end = 4)) %>%
+  group_by(country, year) %>%
+  summarise(mean_mag = mean(mag)) %>%
+  arrange(desc(mean_mag)) %>%
+  filter(country == "America" | country == "Iran") %>%
+  spread(year, mean_mag)
+```
+<p dir = "RTL">
+بنابراین هارپ رد می شود زیرا وضعیت ایران از آمریکا بهتر است.
+</p>
+***
+
+<p dir="RTL"> 
+۱۰. سه حقیقت جالب در مورد زلزله بیابید.
+</p>
+
+<p dir = "RTL">
+مورد اول :
+</p>
+```{r, message=FALSE,warning=FALSE}
+disaster %>% 
+  filter(YEAR > 1007) %>% 
+  select(YEAR) %>% 
+  group_by(YEAR) %>% 
+  summarise(count = n()) %>% 
+  arrange(YEAR) %>%
+  mutate(index = rep(1:14, each = 50)) %>% 
+  group_by(index) %>% 
+  summarise(fifty_by_fifty_years_mean = mean(count)) %>% print()
+```
+
+<p dir = "RTL">
+داده برای این قسمت زلزله های بزرگ بعد از سال ۱۰۰۷ است و سوالی که برررسی شده این است که آیا با گذشت زمان تعداد زلزله های بزرگ بیشتر شده است یا خیر. برای بررسی این گزاره ابتدا تعداد سلسله های هر سال محاسبه شده است و سپس ۵۰ سال ۵۰ سال میانگین تعداد زلزله ها محاسبه شده است و اگر نتیجه را ببینیم index نشان دهنده این است که از ابتدا چندمین ۵۰ سال بررسی شده است و mean نشان دهنده میانگین تعداد زلزله ها برای ۵۰ سال مربوطه است بنابر نتیجه تقریبا مشهود است که با گذر زمان تعداد زلزله های بزرگ افزایش یافته است.
+</p>
+
+<p dir = "RTL">
+مورد دوم :
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+disaster %>% 
+  filter(YEAR > 1007) %>%  
+  select(YEAR, INTENSITY) %>% 
+  group_by(YEAR) %>% 
+  summarise(mean_intensity_per_year = mean(INTENSITY, na.rm = T)) %>% 
+  arrange(YEAR) %>%
+  mutate(index = rep(1:14, each = 50)) %>% 
+  group_by(index) %>% 
+  summarise(fifty_by_fifty_years_mean = mean(mean_intensity_per_year, na.rm = T)) %>% print()
+```
+
+<p dir = "RTL">
+در این قسمت بررسی شد که آیا هر چه زمان جلوتر رفته است شدت زلزله های بزرگ بیشتر شده است یا خیر که به نظر می رسد اینطور نیست.
+</p>
+
+<p dir = "RTL">
+مورد سوم :
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+disaster %>% 
+  filter(!is.na(MONTH)) %>% 
+  group_by(MONTH) %>% 
+  summarise(count = n()) %>% print()
+```
+
+<p dir = "RTL">
+در این قسمت بررسی شد که آیا تعداد زلزله ها در ماه ها متفاوت است یا نه. که با توجه به نتیجه می توان دید که تفاوت چندانی ندارند.
+</p>

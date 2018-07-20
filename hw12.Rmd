@@ -1,0 +1,299 @@
+---
+title: "Association rules"
+subtitle: "Movie recommender systems"
+author: "9510718"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+  theme: cayman
+highlight: github
+---
+  
+  > <p dir="RTL"> 
+  با استفاده از داده نظرهای فیلم به سوالات زیر پاسخ دهید.
+</p>
+  
+  ***
+  
+  <p dir="RTL">
+  ۱. آماره های زیر را بیابید.
+الف. محبوب ترین فیلم کدام است؟
+ب. بیشترین نظرات درباره چه فیلمی داده شده است؟
+پ. منفورترین فیلم کدام است؟
+ت. تعداد فیلم های ساخته شده در هر سال
+ث. در هر سالی مردم به چه ژانری علاقه مند بوده اند.
+</p>
+  
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(arules)
+library(arulesViz)
+library(colorspace)
+
+# Movies
+movie = read_delim('../ml-10M100K/movies.dat',delim = "::" ,col_names = c("MovieID",NA,"Title",NA,"Genres"))
+movie = movie %>% select(1,3,5) 
+
+# Tags
+tag = read_delim('../ml-10M100K/tags.dat',delim = "::" ,col_names = c("UserID",NA,"MovieID",NA,"Tag",NA,"Timestamp"))
+tag = tag %>% select(1,3,5,7) 
+
+# Ratings
+rating = read_delim('../ml-10M100K/ratings.dat',delim = "::" ,col_names = c("UserID",NA,"MovieID",NA,"Rating",NA,"Timestamp"))
+rating = rating %>% select(1,3,5,7) 
+
+movie %>% 
+  mutate(year = as.numeric(str_extract(Title, "(?<=\\()([:digit:]{4})(?=\\))"))) -> movie
+
+tidyr::separate_rows(movie, Genres, sep = "\\|") %>% 
+  filter(Genres != "(no genres listed)") -> movie_genre
+
+#######a
+left_join(movie, rating) %>%
+  group_by(MovieID) %>% 
+  summarise(min_rating = mean(Rating), Title = first(Title), count = n()) %>% 
+  filter(count >= 1000) %>% 
+  arrange(desc(min_rating)) %>% 
+  head(10) %>% print()
+
+#######b
+left_join(movie, rating) %>%
+  group_by(MovieID) %>% 
+  summarise(ratings_cnt = n(), Title = first(Title)) %>% 
+  arrange(desc(ratings_cnt)) %>%
+  head(10) %>% print()
+
+#######c
+left_join(movie, rating) %>%
+  group_by(MovieID) %>% 
+  summarise(min_rating = mean(Rating), Title = first(Title), count = n()) %>% 
+  filter(count >= 1000) %>% 
+  arrange(min_rating) %>% 
+  head(10) %>% print()
+
+#######d
+movie %>% 
+  group_by(year) %>% 
+  summarise(count = n()) -> data
+print(data)
+ggplot(data, aes(x = year, y = count)) + geom_point(color = "orange") + geom_line(color = "purple")
+
+#######e
+
+left_join(movie_genre, rating) %>%
+  group_by(year, Genres) %>%
+  summarise(mean_rating = mean(Rating)) %>% 
+  group_by(year) %>% 
+  filter(mean_rating == max(mean_rating)) %>% 
+  na.omit() -> d
+
+print(d %>% head(10))
+
+```
+
+  ***
+  
+  <p dir="RTL">
+  ۲. ژانر فیلم ها را استخراج نمایید.  سپس آماره های زیر را استخراج نمایید.
+الف. نمودار ستونی تعداد فیلم های هر ژانر
+ب. نمودار همبستگی ژانرها
+پ. متوسط امتیاز به هر ژانر
+ت. دوران طلایی فیلم سازی 
+</p>
+  
+```{r, message=FALSE,warning=FALSE}
+#######a
+library(highcharter)
+
+movie_genre %>% 
+  group_by(Genres) %>% 
+  summarise(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  filter(count > 1) %>% 
+  hchart("column", hcaes(x = "Genres", y = "count"))
+
+#######b
+movie_genre %>% 
+  spread(Genres, year) %>%
+  select(-Title, -MovieID) %>% 
+  transmute_all(funs( ifelse(is.na(.),0,1) ) ) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(
+                         type = "lower", 
+                         lab = TRUE, 
+                         lab_size = 3, 
+                         colors = c("purple", "white", "yellow"), 
+                         ggtheme=theme_bw)
+#######c
+left_join(movie_genre, rating) %>%
+  group_by(Genres) %>%
+  summarise(mean_rating = mean(Rating)) %>% 
+  na.omit() %>% 
+  arrange(desc(mean_rating)) %>%  
+  hchart("column", hcaes(x = "Genres", y = "mean_rating")) %>% 
+  hc_add_theme(hc_theme_flat())
+
+#######d
+left_join(movie, rating) %>%
+  na.omit() %>% 
+  group_by(year) %>% 
+  summarise(year_mean_Rating = mean(Rating)) %>% 
+  arrange(desc(year_mean_Rating)) %>% 
+  head(10) %>% print()
+
+
+```
+
+  ***
+  
+  <p dir="RTL">
+  ۳. نمودار ابر لغات را بر حسب کلمات عنوان فیلم ها رسم نمایید.
+</p>
+  
+```{r, message=FALSE, warning=FALSE}
+library(tidytext)
+library(tm)
+movie$Title %>% 
+    str_replace_all("(?<=\\()([:digit:]{4})(?=\\))", "") %>%
+    str_replace_all("\"","") %>% 
+    str_replace_all("[[:punct:]]","") %>% 
+    str_split(pattern = "\\s") %>% 
+    unlist() %>%
+    str_to_lower() %>% 
+    tm::removeWords(., (str_replace_all(tidytext::stop_words$word ,"[[:punct:]]",""))) %>% 
+    str_trim() %>% 
+    table() %>% 
+    as.data.frame(stringsAsFactors = F) -> data
+
+colnames(data) = c("word", "Freq")
+
+data %>% 
+  filter(!str_to_lower(word) %in% stop_words$word) %>% 
+  filter(str_length(word) > 2) %>% 
+  filter(!str_detect(word, "\\d")) %>% 
+    arrange(desc(Freq)) %>% 
+    slice(2:101) %>%
+    wordcloud2::wordcloud2()
+
+```
+  
+  ***
+  
+  <p dir="RTL">
+  ۴. با استفاده از قوانین همبستگی یک توصیه گر برای فیلم ها بسازید. شبیه ترین فیلم ها به لیست زیر را پیدا کنید.
+</p>
+  
+* Castle in the Sky (1986)
+* Cast Away (2000)
+* No Country for Old Men (2007)
+* Memento (2000)
+
+```{r, message=FALSE, warning=FALSE}
+goodrate = left_join(movie, rating) %>% 
+  na.omit() %>% 
+  filter(Rating >= 4) %>% 
+  filter(UserID <= 25000)
+
+d4 <- data.frame(
+  TID = as.numeric(goodrate$UserID), 
+  item= as.character(goodrate$Title)
+)
+
+trans <- as(split(d4[,"item"], d4[,"TID"]), "transactions")
+
+itemFrequencyPlot(trans, topN = 10)
+
+apriori(trans, parameter = list(support = 0.03,
+                                 confidence = 0.25, minlen = 2, maxlen = 8)) -> rules
+arules::inspect(sort(rules, by = "lift")[1:8])
+
+subset(rules, lhs %in% c("Castle in the Sky (Tenkû no shiro Rapyuta) (1986)")) -> subrul
+#arules::inspect(sort(subrul, by = "lift")[1])    #chizi peyda nkrd, va baraye dade e bishtr ram e mn moshkel peyda mikone.
+
+subset(rules, lhs %in% c("Cast Away (2000)")) -> subrul
+arules::inspect(sort(subrul, by = "lift")[1])
+
+subset(rules, lhs %in% c("Memento (2000)")) -> subrul
+arules::inspect(sort(subrul, by = "lift")[1])
+
+
+```
+
+***
+  
+<p dir="RTL">
+  ۵. تمرین سخت: در گیت هاب برای خود اکانت درست کنید. همه تمرین های خود را آنجا بارگذاری کنید! و لینک آن را ارسال نمایید.
+</p>
+
+<a href = "https://github.com/fitmal/data_analisys.git" >
+لینک تمارین
+</a>
+  
+  ***
+  
+  <p dir="RTL">
+  ۶. پنج انتقاد از درس و نحوه تدریس را بیان کنید.
+</p>
+
+<p dir = "RTL">
+۱- شیوه امتحان به شکل تمارین و نحوه ای که کلاس برگزار شده بود نبود. (امتحان خیلی تئوری تر بود و تاکید در تمرین ها انقدر نبود)
+۲- بارم امتحان ها برای این درس که بیشتر تمرین محور بود زیاد است.
+۳- ساعت کلاس! 
+۴- کلاس تی ای بد نبود اما می توانست بهتر هم باشد! مثلا زمانش بیشتر می بود زیرا حجم مطالب بالا بود.
+۵- ۵ انتقاد واقعا زیاد است !
+</p>
+  
+  ***
+  
+  <p dir="RTL">
+  ۷. پنج پیشنهاد برای بهتر شدن درس بیان کنید.
+</p>
+  
+<p dir = "RTL">
+۱- مباحث امتحان و تمرین ها یک شکل باشد.
+۲- بارم بندی امتحان کمتر باشد.
+۳- کلاس تی ای بیشتر باشد مثلا ۲ جلسه در هفته یا منابع به طور دقیق تری مشخص شوند.
+۴- ساعت کلاس دیر تر باشد. 
+۵- تمیزکردن داده بیشتر توضیح داده شود.
+</p>
+  
+  ***
+  
+  <p dir="RTL">
+  ۸. سه موضوع آماری جدید برای جایگزینی در سرفصل ها پیشنهاد دهید.
+</p>
+
+<p dir= "RTL">
+۱- روش ها برای داده های بزرگ
+۲- یادگیری ماشین
+۳- تمیز کردن داده
+</p>
+  
+  ***
+  
+  <p dir="RTL"> 
+  ۹. سه داده جالب برای کار در کلاس پیشنهاد دهید.
+</p>
+
+<p dir= "RTL">
+۱- داده های مربوط به هواپیما
+۲- داده های آب و هوا
+۳- داده های مصرف دارو
+</p>
+  
+  ***
+  
+  <p dir="RTL"> 
+  ۱۰. چهار نکته مهمی که در کلاس یاد گرفتید را بیان کنید.
+</p>
+
+<p dir = "RTL">
+۱- نمایش دادن کاری که انجام شده خیلی مهم است.
+۲- همبستگی ممکن است تصادفی باشد و قابل اعتماد نباشد.
+۳- تحلیل داده می تواند به صورت مهندسی نیز باشد.
+۴- با استفاده نکردن درست از ابزار نتیجه می تواند به راحتی اشتباه شود.
+</p>
+  
+  

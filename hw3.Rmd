@@ -1,0 +1,777 @@
+---
+title: "Third Week: Exploratory Data Analysis"
+subtitle: "LaLiga Analysis"
+author: "95107188"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<h1 dir="RTL"> 
+تمرین سری سوم: از لالیگا تا لیگ برتر
+</h1>
+
+
+> <p dir="RTL"> 
+با استفاده از داده های لیگ دسته اول اسپانیا به سوالات زیر پاسخ دهید.
+از هر دو ابزار
+ggplot2
+و
+highcharter
+برای این کار تصویرسازی استفاده نمایید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. تعداد قهرمانی های تیم ها در تاریخ لالیگا  را استخراج کرده و نمودار ستونی آنها را رسم کنید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+library(tidyverse)
+library(highcharter)
+library(engsoccerdata)
+library(dplyr)
+laliga = as.tbl(spain)
+
+laliga %>% 
+  filter(round == "league") -> laliga_no_phase
+
+laliga_no_phase %>% 
+  group_by(Season, home) %>% 
+  summarise(
+    Hscore = (3*sum(hgoal > vgoal) + sum(hgoal == vgoal)),
+    Hdiff = sum(hgoal) - sum(vgoal)
+  ) -> part1
+
+
+part1 %>% 
+  select(team = home, Season, Hscore, Hdiff) -> partt1
+
+laliga_no_phase %>% 
+  group_by(Season, visitor) %>% 
+  summarise(
+    Vscore = (3*sum(vgoal > hgoal) + sum(hgoal == vgoal)),
+    Vdiff = sum(vgoal) - sum(hgoal)
+  ) -> part2
+
+part2 %>% 
+  select(team = visitor, Season, Vscore, Vdiff) -> partt2
+
+full_join(partt1, partt2) -> res1
+
+res1 %>% 
+  mutate(score = Hscore + Vscore, diff = Hdiff + Vdiff) -> ress1
+
+ress1 %>% 
+  group_by(Season) %>% 
+  arrange(desc(score), desc(diff)) %>% 
+  slice(1) -> resss1
+
+resss1 %>% 
+  group_by(team) %>% 
+  summarise(number_of_championship = n()) %>% 
+  arrange(desc(number_of_championship)) %>% 
+  hchart(type = "bar", hcaes(x = team, y = number_of_championship)) %>%  
+    hc_add_theme(hc_theme_538())
+
+resss1 %>% 
+  group_by(team) %>% 
+  summarise(number_of_championship = n()) %>% 
+  arrange(desc(number_of_championship)) %>% 
+  ggplot(data = .) + geom_bar(aes(x = reorder(team, -number_of_championship),
+        y = number_of_championship), stat = "identity", fill = "cyan4", color = "cyan4") +
+  xlab("team") + ylab("number of championship") + theme_linedraw() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+<p dir = "RTL">
+در کد بالا ابتدا در laliga_no_phase کل بازی های لیگ را قرار می دهیم.
+سپس در part1 امتیاز تیم وقتی که میزبان بوده است را حساب می کنیم به همین صورت برای part2 وقتی تیم مهمان بوده است.سپس این دو را به صورت متاسب ترکیب می کنیم و در ress1 قرار می دهیم.
+سپس به ازای هر فصل قهرمان را پیدا می کنیم و در  resss1 قرار می دهیم.
+</p>
+***
+
+<p dir="RTL">
+۲. کسل کننده ترین لیگ و تیم را بیابید.
+نمودار ده تیم و ده فصل کسل کننده را رسم کنید.
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+#lig e kesel konande ligi ast ke kamtarin tedad gol ra darad.
+laliga_no_phase %>% 
+  group_by(Season) %>% 
+  summarise(number_of_goals = sum(hgoal) + sum(vgoal)) %>% 
+  arrange(number_of_goals) %>% 
+  slice(1:10) %>% 
+  hchart(type = "column", hcaes(x = Season, y = number_of_goals))
+
+laliga_no_phase %>% 
+  group_by(Season) %>% 
+  summarise(number_of_goals = sum(hgoal) + sum(vgoal)) %>% 
+  arrange(number_of_goals) %>% 
+  slice(1:10) %>% 
+  ggplot(data = .) + 
+  geom_bar(mapping = aes(x = Season, y = number_of_goals), stat = "identity",
+           fill = "orange", color = "orange") +
+  xlab("Season") + ylab("monotonousness") + theme_linedraw() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+#agar chek knim bishtrin tedad e gol dar yek bazi 14 ta bude ast.
+laliga_no_phase %>% 
+  mutate(goal_per_game = vgoal + hgoal) %>% 
+  arrange(desc(goal_per_game)) %>% 
+  View()
+
+#meyar e zir bayangar e mizan kesek konande budn e har bazi ast.
+#tavan e 4 b dalil vazeh tr shodn e kesel konandegi e tim has(baraye fasele grftn tim ha bar asas e in meyar).
+laliga_no_phase %>% 
+  mutate(monotonousness = (14 - (vgoal + hgoal))^4) -> with_monotonous
+#dar zir ebteda kesel konandegi e bazi hayi k tim mizban ast va sepas kesel konandegi bazi hayi k
+#tim mizban ast ra be dast miavarim sepas jam mikonim va bar tedad e kole bazi haye tim taghsim mikonim.
+with_monotonous %>% 
+  group_by(home) %>% 
+  summarise(Hnum = n(), Hmomonotonousness = sum(monotonousness)) %>% 
+  select(team = home, Hnum, Hmomonotonousness) -> s1
+
+with_monotonous %>% 
+  group_by(visitor) %>% 
+  summarise(Vnum = n(), Vmomonotonousness = sum(monotonousness)) %>% 
+  select(team = visitor, Vnum, Vmomonotonousness) -> s2
+
+full_join(s1, s2) %>% 
+  mutate(monotonousness_game = (Vmomonotonousness + Hmomonotonousness)/ (Hnum + Vnum)) %>% 
+  arrange(desc(monotonousness_game)) %>% 
+  slice(1:10) %>% 
+  hchart(type = "column", hcaes(x = team, y = monotonousness_game), name = "momonotonousness") 
+
+
+```
+
+
+<p dir="RTL">
+توضیحات لازم به صورت کامنت در کد نوشته شده است.
+</p>
+***
+
+<p dir="RTL">
+۳. در چند درصد موارد قهرمان نیم فصل در پایان فصل قهرمان شده است؟
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+laliga_no_phase %>% 
+  group_by(Season, home) %>% 
+  summarise(Hnum = n()) %>% 
+  select(team = home, Hnum, Season) -> s31
+
+laliga_no_phase %>% 
+  group_by(Season, visitor) %>% 
+  summarise(Vnum = n()) %>%
+  select(team = visitor, Vnum, Season) -> s32
+
+full_join(s31, s32) ->  cnt_mid_season
+
+#mitavan moshahede kard k tedad e bazi haye har fasl baraye hr team barabar ast, hnum = vnum
+
+laliga_no_phase %>% 
+  group_by(Season) %>% 
+  arrange(Date) %>% 
+  slice(1:(n()/2)) -> laliga_mid
+
+#dar laliga_mid nesfe bazi haye har fasl rikhte mishavad.
+laliga_mid %>% 
+  group_by(Season, home) %>% 
+  summarise(
+    Hscore = (3*sum(hgoal > vgoal) + sum(hgoal == vgoal)),
+    Hdiff = sum(hgoal) - sum(vgoal)
+  ) -> s31
+
+
+s31 %>% 
+  select(team = home, Season, Hscore, Hdiff) -> ss31
+
+laliga_mid %>% 
+  group_by(Season, visitor) %>% 
+  summarise(
+    Vscore = (3*sum(vgoal > hgoal) + sum(hgoal == vgoal)),
+    Vdiff = sum(vgoal) - sum(hgoal)
+  ) -> s32
+
+s32 %>% 
+  select(team = visitor, Season, Vscore, Vdiff) -> ss32
+
+full_join(ss31, ss32) -> res3
+
+res3 %>% 
+  mutate(score = Hscore + Vscore, diff = Hdiff + Vdiff) -> ress3
+#ress3 manande soal e 1 mohasebe mishavad.
+
+ress3 %>% 
+  group_by(Season) %>% 
+  arrange(desc(score), desc(diff)) %>% 
+  slice(1) -> resss3
+
+#resss3 manande soal e 1 mohasebe mishavad.
+#banabarin dar resss1 ghahreman e fasl va dar resss3 ghahreman e nim fasl ast.
+ans = 0
+for (i in 1:86) {
+  if(resss1[i, ]$team == resss3[i, ]$team){
+    ans = ans + 1
+  }
+}
+print((ans/86)*100)
+
+```
+
+***
+
+<p dir="RTL">
+۴. در بین سال های ۲۰۰۱ تا ۲۰۱۰ گربه سیاه تیم های بزرگ چه تیم هایی بوده است؟
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+#dar ress1 emtiaze har team dar har sal vojud darad.
+ress1 %>% 
+  filter(2000 < Season & Season <= 2010) %>% 
+  group_by(team) %>% 
+  mutate(all_score = sum(score)) -> score_2000_to_2010
+
+score_2000_to_2010 %>% 
+  select(team, all_score) %>% 
+  arrange(desc(all_score)) %>% 
+  unique.data.frame() %>%
+  head(4) -> big_teams
+
+#dar big_teams 4 team i k daraye bishtrin emtiaz hastnd negah dari mishavad.
+score_2000_to_2010 %>% 
+  select(team, all_score) %>% 
+  arrange(all_score) %>% 
+  unique.data.frame() %>%
+  head(10) -> weak_teams
+#dar weak_teams 10 team e zayif(daraye kamtrin emtiaz) negahdari mishavad.
+#gorbe siah ra b in sorat dar nazar grftim k ham zayif bashad ham tim e bozorgi ra bebarad.
+#hamchenin emtiaz ra majmu e emtiaz team dr beyne sal haye 2001 ta 2010 dr nzr grfte im.
+laliga_no_phase %>% 
+  filter(2001 <= Season & Season <= 2010) %>% 
+  filter(home %in% big_teams$team & visitor %in% weak_teams$team & hgoal < vgoal) -> p41
+#p41 vaghti ast k yek team e zayif yek team ghavi ra borde ast va team e ghavi mizban bude ast 
+#va p51 baraks.  
+  
+laliga_no_phase %>% 
+  filter(2001 <= Season & Season <= 2010) %>% 
+  filter(visitor %in% big_teams$team & home %in% weak_teams$team & vgoal < hgoal) -> p42
+
+rbind(p41, p42) %>% 
+  print()
+
+```
+
+***
+
+<p dir="RTL">
+۵. در تاریخ لالیگا کدام تیم رکورددار زودترین قهرمانی است؟
+همچنین کدام تیم مقتدرانه ترین قهرمانی را داشته است؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+
+<p dir="RTL">
+قسمت اول
+</p>
+```{r}
+laliga_no_phase %>% 
+  group_by(home) %>% 
+  select(team = home, opp = visitor, tgoal = hgoal, ogoal = vgoal, date = Date, Season) -> p61
+laliga_no_phase %>% 
+  group_by(visitor) %>% 
+  select(team = visitor, opp = home, tgoal = vgoal, ogoal = hgoal, date = Date, Season) -> p62
+
+rbind(p61, p62) -> double_games
+
+#dar double_games b ezaye har team hame bazi hayash ra darim va b do daste home o visitor niaz nadarim!!
+double_games %>% 
+  mutate(number_game_of_team = 0) -> with_number 
+
+View(double_games)
+for (s in (with_number$Season %>% unique)) {
+    (with_number %>% filter(Season == s))$team %>%  unique -> team_of_season
+    for (t in team_of_season) {
+      with_number %>% filter(Season == s, team == t) %>% arrange(date) -> d1
+      for (j in 1:(dim(d1)[1])) {
+        d = d1[j, ]$date
+        with_number$number_game_of_team[which(with_number$team == t &  with_number$date == d)] = j
+      }
+    }
+}
+View(with_number)
+
+#dar with_number b ezaye har bazi dar number_game_of_team neshad midahim an bazi bazi e chandom e an team dar fasle marbute ast.(neshan midahim bazi e chandom e team ast na opp!)
+cur_score = ress1
+result5 = resss1
+result5 %>% 
+  mutate(week = 0) -> result5
+#dar cur_score emtiaz haye nahayi e har team dar payan e fasl ra darim mikhahim cur_score ra gam b gam update konim yani yeki yeki bazi ha ra aghab miravim k bebinim koja ghahremani moshakhas shode ast.
+for(s in resss1$Season){
+  if(s == 1979){
+    next
+  }
+  cur_score = ress1
+  cnt_week = 0
+  resss1 %>% 
+    filter(Season == s) -> champ_in_Season
+  
+  
+  #ress1 score har team ra ta akhr darad anghadr aghab miravim va kam mikonim k ...
+  cur_score %>% 
+    filter(Season == s) %>% 
+    select(Season, team, score) -> cur_score
+  with_number %>% filter(Season == s) -> filtered_season
+  filtered_season %>% arrange(desc(number_game_of_team)) %>% head(1) -> step 
+  for(i in ((step$number_game_of_team):1)){
+    filtered_season %>% 
+      filter(number_game_of_team == i) -> sliced_season
+      
+    sliced_season %>% 
+      group_by(team) %>% 
+      summarise(
+        score = (3*sum(tgoal > ogoal) + sum(tgoal == ogoal)),
+        diff = sum(tgoal) - sum(ogoal)
+      ) -> part51
+    
+    part51 %>% 
+      select(team, score, diff) -> partt51
+    
+    
+    partt51 -> to_diff
+    to_diff[is.na(to_diff)] <- 0
+    
+    
+    for (te in cur_score$team) {
+      ss = cur_score$score[which(cur_score$team == te)]
+      ss = ss - to_diff$score[which(to_diff$team == te)]              
+      cur_score$score[which(cur_score$team == te)] <- ss
+    }
+    
+    cur_score %>% 
+      arrange(desc(score)) %>% slice(1:2) %>% .$score -> v
+    
+    v[1] - v[2] -> v
+    
+    
+    if(cnt_week*3 < v){
+      cnt_week = cnt_week + 1
+      result5$week[which(result5$Season == s )] = cnt_week
+    }else {
+      break
+    }    
+  }
+}
+#dar nahayat dar res5 b ezaye har sal darim az ch tedad hafte ghabl az hafte akhr ghahreman moshkhas shode ast (dar sotune week) banabar in bar hasbe week b surate nozuli sort mikonim va 10 team e aval ra neshan midahim.
+result5 %>% arrange(desc(week)) %>% 
+  head(10) %>% print()
+
+```
+
+<p dir="RTL">
+قسمت دوم
+</p>
+```{r}
+#dar ress1 emtiaza has
+ress5 = ress1
+ress5 %>% 
+  group_by(Season) %>% 
+  arrange(desc(score), desc(diff)) %>% 
+  slice(1:2) -> resss5
+
+resss5 %>% 
+  group_by(Season) %>% 
+  summarise(dif_champ = score[1] - score[2]) %>% 
+  arrange(desc(dif_champ)) %>% 
+  head(1) 
+
+```
+
+
+<p dir="RTL">
+۶. طولانی ترین نوار پیروزی مساوی و شکست مال چه تیم هایی است؟
+</p>
+
+```{r}
+View(laliga_no_phase)
+laliga_no_phase %>% 
+  group_by(home) %>% 
+  select(team = home, opp = visitor, tgoal = hgoal, ogoal = vgoal, date = Date, Season) -> p61
+laliga_no_phase %>% 
+  group_by(visitor) %>% 
+  select(team = visitor, opp = home, tgoal = vgoal, ogoal = hgoal, date = Date, Season) -> p62
+
+rbind(p61, p62) -> double_games
+
+
+double_games %>% 
+  select(team) %>% 
+  unique() -> all_teams
+
+all_teams %>% 
+  mutate(consecutive_wins = 0, consecutive_ties = 0, consecutive_loose = 0) -> result6
+
+for (t in all_teams$team) {
+  double_games %>% 
+    filter(team == t) %>%
+    arrange(date) %>% 
+    mutate(diff = tgoal - ogoal) %>% .$diff  -> team_games
+  
+  
+  last = F
+  cur_streak = 0
+  max_streak = 0
+  for(g in team_games){
+    if(g>0 & last)
+      cur_streak = cur_streak + 1
+    else if(g>0 & !last){
+      last = T
+      cur_streak = 1
+    }
+    else{
+      last = F
+      cur_streak = 0
+    }
+    max_streak = max(cur_streak, max_streak)
+  }
+  result6$consecutive_wins[which(result6$team == t)]   =  max_streak
+  #result6 %>% filter(team == t) %>% .$consecutive_wins <- max_streak
+}
+
+for (t in all_teams$team) {
+  double_games %>% 
+    filter(team == t) %>%
+    arrange(date) %>% 
+    mutate(diff = tgoal - ogoal) %>% .$diff  -> team_games
+  
+  
+  last = F
+  cur_streak = 0
+  max_streak = 0
+  for(g in team_games){
+    if(g==0 & last)
+      cur_streak = cur_streak + 1
+    else if(g==0 & !last){
+      last = T
+      cur_streak = 1
+    }
+    else{
+      last = F
+      cur_streak = 0
+    }
+    max_streak = max(cur_streak, max_streak)
+  }
+  result6$consecutive_ties[which(result6$team == t)]   =  max_streak
+  #result6 %>% filter(team == t) %>% .$consecutive_wins <- max_streak
+}
+
+
+
+for (t in all_teams$team) {
+  double_games %>% 
+    filter(team == t) %>%
+    arrange(date) %>% 
+    mutate(diff = tgoal - ogoal) %>% .$diff  -> team_games
+  
+  
+  last = F
+  cur_streak = 0
+  max_streak = 0
+  for(g in team_games){
+    if(g < 0 & last)
+      cur_streak = cur_streak + 1
+    else if(g < 0 & !last){
+      last = T
+      cur_streak = 1
+    }
+    else{
+      last = F
+      cur_streak = 0
+    }
+    max_streak = max(cur_streak, max_streak)
+  }
+  result6$consecutive_loose[which(result6$team == t)]   =  max_streak
+  #result6 %>% filter(team == t) %>% .$consecutive_wins <- max_streak
+}
+#team ba bishtrin bord e motevali:
+result6 %>% arrange(desc(consecutive_wins)) %>% head(1) %>% print() 
+#team ba bishtrin mosavi e motevali:
+result6 %>% arrange(desc(consecutive_ties)) %>% head(1) %>% print()
+#team ba bishtrin bakht e motevali:
+result6 %>% arrange(desc(consecutive_loose)) %>% head(1) %>% print()
+```
+
+***
+
+<p dir="RTL">
+۷. زودترین سقوط مال کدام تیم بوده است؟
+</p>
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r}
+ress1 %>% 
+  group_by(Season) %>% 
+  arrange((score), (diff)) %>% 
+  slice(1) -> resss_71
+
+View(with_number)
+
+cur_score = ress1
+result7 = resss_71
+result7 %>% 
+  mutate(week = 0) -> result7
+
+for(s in resss1$Season){
+  if(s == 1979){
+    next
+  }
+  cur_score = ress1
+  cnt_week = 0
+  resss_71 %>% 
+    filter(Season == s) -> looser_in_Season
+  
+  
+  #ress1 score har team ra ta akhr darad anghadr aghab miravim va kam mikonim k ...
+  cur_score %>% 
+    filter(Season == s) %>% 
+    select(Season, team, score) -> cur_score
+  with_number %>% filter(Season == s) -> filtered_season
+  filtered_season %>% arrange(desc(number_game_of_team)) %>% head(1) -> step 
+  for(i in ((step$number_game_of_team):1)){
+    filtered_season %>% 
+      filter(number_game_of_team == i) -> sliced_season
+    
+    sliced_season %>% 
+      group_by(team) %>% 
+      summarise(
+        score = (3*sum(tgoal > ogoal) + sum(tgoal == ogoal)),
+        diff = sum(tgoal) - sum(ogoal)
+      ) -> part51
+    
+    part51 %>% 
+      select(team, score, diff) -> partt51
+    
+    
+    partt51 -> to_diff
+    to_diff[is.na(to_diff)] <- 0
+    
+    
+    for (te in cur_score$team) {
+      ss = cur_score$score[which(cur_score$team == te)]
+      ss = ss - to_diff$score[which(to_diff$team == te)]              
+      cur_score$score[which(cur_score$team == te)] <- ss
+    }
+    
+    cur_score %>% 
+      arrange((score)) %>% slice(1:4) %>% .$score -> v
+    
+    v[4] - v[1] -> v
+    
+    
+    if(cnt_week*3 < v){
+      cnt_week = cnt_week + 1
+      result7$week[which(result7$Season == s )] = cnt_week
+    }else {
+      break
+    }    
+  }
+}
+
+result7 %>% arrange(desc(week)) %>% 
+  head(10) %>% print()
+#in soal manande soal e 5 ast ba in tafavot k shart i k bayad chk knim b surate bala ast.(ekhtelaf e team e akhar va 3 ta mande b akhar bayad chk shavad va mnzur az team e akhr team i ast k akhr e jadval ast.)
+```
+
+***
+
+
+<p dir="RTL">
+۸.مانند شکل بالا تصویری از روند تغییر رتبه تیم ها در طول فصل ۱۹۹۸ رسم نمایید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+```{r}
+#b in surat amal mikonim k data i b dast miavarim k neshan dehad ta har tarikh emtiaze har team cheghad ast.!
+double_games %>%
+  filter(Season == 1998) -> game_1998
+game_1998 %>% 
+  mutate(team_score = ifelse(tgoal > ogoal, 3, ifelse(tgoal==ogoal,1,0)), dif_goal = tgoal - ogoal) %>%
+  arrange(date) %>% 
+  group_by(team) %>%
+  mutate(sc = cumsum(team_score), df = cumsum(dif_goal)) %>% 
+  select(team, date, sc, df) %>% arrange(date) -> res8
+as.data.frame(res8) -> res8
+
+
+
+for (i in seq(1,80,1)) {
+  d = res8$date %>% unique %>% sort %>% .[i]
+  e = res8$date %>% unique %>% sort %>% .[i-1]
+  for (t in res8$team %>% unique()) {
+    if((res8 %>% filter(team==t, date==d) %>% nrow()) < 1){
+      df <- data.frame(t, d, NA, NA)
+      names(df) <- c("team", "date", "sc", "df")
+      rbind(res8, df) -> res8
+    }
+  }
+}
+res8 %>% 
+  arrange(team, date) -> res8
+#80 ta 80 ta team ha
+
+for (i in seq(1,1600,80)) {
+  first = res8[i, ]
+  if(is.na(first$sc)){
+    res8[i, ]$sc = 0
+    res8[i, ]$df = 0
+  }
+  for (j in 1:79) {
+    if(is.na(res8[i+j, ]$sc)){
+      res8[i+j, ]$sc = res8[i+j - 1, ]$sc
+      res8[i+j, ]$df = res8[i+j - 1, ]$df
+    }
+  }
+}
+res8 %>% arrange(date, desc(sc), desc(df)) -> res8
+
+res8 %>% 
+  mutate(rank = 0) -> res8
+for (i in 1:1600) {
+  if(i %% 20 != 0){
+    res8[i, ]$rank = i%%20  
+  }else {
+    res8[i, ]$rank = 20  
+  }
+  
+}
+
+ress1 %>% filter(Season == 1998) %>% arrange(desc(score, diff))-> hc_data
+
+res8 %>% 
+  hchart(type = "line",hcaes(x = date, y = rank, group = team)) %>% 
+  hc_yAxis_multiples(
+    list(title = list(text = "position"), tickInterval = 1, max = 20, min = 1, reversed = T),
+    list(opposite = T, title = list(enabled = F), thickInterval = 1, max = 19, min = 0,
+         reversed = T, categories = hc_data$team)
+  ) %>% 
+  hc_legend(enabled = F)
+
+
+```
+
+
+***
+
+
+<p dir="RTL">
+۹. جدولی مشابه بالا برای فصل ۲۰۱۲ از  کل نتایج طراحی کنید.
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+library(ggthemes)
+laliga_no_phase %>% filter(Season == 2012) -> data9
+  
+library(ggplot2)
+library(scales) # for muted function
+ggplot(data9, aes(reorder(home,desc(home)), visitor )) + # x and y axes => Var1 and Var2
+  geom_tile() + # background colours are mapped according to the value column
+  scale_x_discrete(position = "top") +
+  geom_text(aes(fill = data9$FT,label = data9$FT)) + # write the values
+  theme_tufte()+ 
+  theme(axis.text.x = element_text(angle = 45, hjust = -0.1) ) +
+  xlab("") + ylab("")
+```
+
+***
+
+<p dir="RTL">
+۱۰. سه آماره به همراه نمودار فردوسی پسند استخراج کنید.
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+```{r}
+#soal e aval : har team dr chnd lig hozor dashte ast!
+double_games %>% 
+  group_by(team) %>% 
+  select(Season) %>% 
+  unique() %>% 
+  mutate(z = n()) %>% select(team, z) %>% unique.data.frame() %>% arrange(desc(z)) %>% 
+  hchart(type = "pyramid",hcaes(x = team, y = z))
+
+#soale e dovom : beyne sal e 2000 ta 2016 kodam 2 tim bude and k aksrn yek tim , tim e digar ra borde ast va b in surat neshan midahim k bazi hayi k balaye 60 darsad yek tim digari ra borde ast ra dar nazar migirim va b ezaye tim hayi k in vijegi ra darand tedad team hayi k bar an ha ghaleb bude and ra mohasebe mikonim va nemudar ra rasm mikonim.
+double_games %>% filter(2000 <= Season, Season <= 2016) %>% 
+  group_by(team, opp) %>% 
+  mutate(cnt = n(), twin = sum(tgoal > ogoal), owin = sum(ogoal > tgoal)) %>%
+  select(team, opp, cnt, twin, owin) %>% unique.data.frame() %>%  
+  mutate(tpercent = (twin/cnt)*100, opercent = (owin/cnt)*100) %>% 
+  filter(cnt >= 10) %>% 
+  arrange(desc(tpercent)) -> res102
+res102 %>% head(63) -> res102
+res102 %>% 
+  group_by(team) %>% 
+  mutate(k = n()) %>% 
+  select(team, k) %>% unique.data.frame() -> res102
+res102 %>% 
+  hchart(type = "pie",hcaes(x = team, y = k)) %>% 
+    hc_add_theme(hc_theme_538())
+
+#soal e sevom : tedad  bord e barca, bord e real , mosavi
+
+double_games %>% filter(team == "FC Barcelona", opp == "Real Madrid") %>% 
+  mutate(bwin = sum(tgoal > ogoal) , rwin = sum(ogoal > tgoal), tie = sum(ogoal == tgoal)) %>% 
+  head(1)
+df <- data.frame("Barca wins", 68)
+names(df) <- c("data", "count")
+
+df1 <- data.frame("Real wins", 72)
+names(df1) <- c("data", "count")
+
+df2 <- data.frame("tie", 32)
+names(df2) <- c("data", "count")
+rbind(df,df1, df2) -> res103 
+res103 %>% 
+  hchart("column", hcaes(x = data, y = count)) %>% 
+  hc_size(height = 500, width = 950) %>% hc_add_theme(hc_theme_ffx())
+
+  
+
+```
+

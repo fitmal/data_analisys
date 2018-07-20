@@ -1,0 +1,474 @@
+---
+title: "first week: Introduction to R and Rstudio"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+
+<h1 dir="RTL"> 
+تمرین سری اول: چند مساله
+</h1>
+
+<p dir="RTL"> 
+به سوال های زیر را از طریق نوشتن یک کد پاسخ دهید.
+</p>
+
+***
+
+<h2 dir="RTL">
+ماتریس دوستانه
+</h2>
+
+<p dir="RTL">
+یک ماتریس
+$(n,n)$
+که شامل اعداد 
+$1,2,...,n^2$
+است. دوستانه نامیده میشود اگر مجموع سطرها با مجموع ستون های آن برابر شوند. مثال هایی از ماتریس های دوستانه از بعد ۴و۵و۶ ارایه دهید. 
+</p>
+
+***
+<h3 dir = "RTL">
+پاسخ مسئله برای n = 4
+</h3>
+
+```{r}
+Doubly_even <- function(n){
+  m <- matrix(c(1:16), nrow = n, ncol = n, byrow = TRUE)
+  for (i in 1:n/4) {
+    for (j in 1:n/4) {
+      m[i, j] = n*n + 1 - m[i,j]  
+    }
+  }
+  
+  for (i in 1:floor(n/4)) {
+    for (j in (3*floor(n/4) + 1):n) {
+      m[i, j] = n*n + 1 - m[i,j]  
+    }
+  }
+
+  for (i in (3*floor(n/4) + 1):n) {
+    for (j in 1:floor(n/4)) {
+      m[i, j] = n*n + 1 - m[i,j]  
+    }
+  }
+  
+  for (i in (3*floor(n/4) + 1):n) {
+    for (j in (3*floor(n/4) + 1):n) {
+      m[i, j] = n*n + 1 - m[i,j]  
+    }
+  }
+  
+  for (i in (floor(n/4) + 1):(3*floor(n/4))) {
+    for (j in (floor(n/4) + 1):(3*floor(n/4))) {
+      m[i, j] = n*n + 1 - m[i,j]  
+    }
+  }  
+  return(m)
+}
+
+Doubly_even(4)
+```
+<h3 dir = "RTL">
+پاسخ مسئله برای n = 5
+</h3>
+```{r}
+
+odd_magic <- function(n) {
+  zero <- rep(0, times = n^2 )
+  
+  m <- matrix(zero, nrow = n, ncol = n)
+  
+  i <- floor(n/2) + 1
+  j <- n - 1 + 1
+  
+  
+  m[i, j] <- 1
+  
+  k <- 2
+  i <- i - 1
+  j <- j + 1
+  while (k < n^2 + 1) {
+
+    if ((i == 0) & (j == n + 1)){
+      i <- 1
+      j <- n - 1
+    } else {
+      
+      if (i <= 0) {
+        i <- n
+      }
+      if (j == n + 1) {
+        j <- 1
+      }
+    }   
+    
+    if (m[i, j] != 0) {
+      i <- i + 1
+      j <- j - 2
+      next
+    }else {
+      m[i, j] = k
+      k <- k+1
+    }
+    
+    
+    i <- i - 1
+    j <- j + 1
+    
+  }
+  return(m)  
+}
+
+odd_magic(5)
+```
+<h3 dir = "RTL">
+پاسخ مسئله برای n = 6
+</h3>
+```{r}
+even_magic <- function(n) {
+  zero <- rep(0, times = n^2 )
+  m <- matrix(zero, nrow = n, ncol = n)
+  
+  size <- n*n
+  halfN <- n/2
+  subSquareSize <- size/4
+  quadrantFactors = c(0, 2, 3, 1)
+  subSquare = odd_magic(halfN)
+  
+  for (r in 1:n) {
+    for (c in 1:n) {
+      quadrant <- (floor((r - 1) /(halfN))) * 2 + floor(((c - 1) / halfN))
+      m[r, c] = subSquare[((r - 1) %% halfN) + 1, ((c - 1) %% halfN) + 1]
+      m[r, c] = m[r,c] + quadrantFactors[quadrant + 1]*subSquareSize
+    }
+  }
+  
+  nColsLeft <- floor(halfN / 2)
+  nColsRight <- nColsLeft - 1
+  
+  for (r in 1:halfN) {
+    for (c in 1:n) {
+      if(c < nColsLeft + 1 |  c >= n - nColsRight + 1 | 
+         (c == nColsLeft & r == nColsLeft)){
+        if(c == 0 & r == nColsLeft){
+          next
+        }
+        tmp = m[r, c]
+        m[r, c] = m[r + halfN, c]
+        m[r + halfN][c] = tmp
+          
+      }
+    }
+  }
+  return(m)
+  
+}
+even_magic(6)
+```
+<p dir="RTL"> 
+برای پاسخ به این سوال الگوریتم های مربوط به مربع های جادویی به اندازه فرد و 4k و 4k + 2پیاده سازی شده اند.
+</p>
+
+***
+<h2 dir="RTL">
+جایشگت  عجیب
+</h2>
+
+<p dir="RTL">
+جایگشت هایی از اعداد ۱ تا ۱۳ را پیدا کنید که در شرایط زیر صدق کنند:
+</p>
+
+$$ a = (a_1, a_2,..., a_{13})$$
+$$\frac{a_1}{a_2+a_3} = \frac{a_2+a_3}{a_3+a_4+a_5}<1$$
+$$\frac{a_6}{a_6+a_7}= \frac{a_6+a_7}{a_7+a_8+a_9} = \frac{a_7+a_8+a_9}{a_5+a_9+a_{10}} <1$$
+
+$$\frac{a_{11}+a_{12}}{a_{12}+a_{13}}=\frac{a_{12}+a_{13}}{a_{13}+a_{10}}<1$$
+
+***
+```{r}
+library(gtools)
+
+condition1 <- function(v){
+  return ( ( v[1] / (v[2] + v[3]) == (v[2]+v[3]) / (v[3]+v[4]+v[5]) ) &
+             (v[1] / (v[2] + v[3]) < 1) )
+}
+
+condition2 <- function(v){
+  return ( v[6] / (v[6] + v[7]) == (v[6]+v[7]) / (v[7] + v[8] + v[9]) &
+             v[6] / (v[6] + v[7]) == (v[7] + v[8] + v[9]) / (v[5] + v[9] + v[10]) &
+             v[6] / (v[6] + v[7]) < 1)
+}
+
+condition3 <- function(a){
+  return ( (a[11]+ a[12]) / (a[12] + a[13]) == (a[12]+a[13]) / (a[13] + a[10]) & 
+             (a[11]+ a[12]) / (a[12] + a[13]) < 1  )
+}
+
+
+matrix <- permutations(13,5)
+
+for (i in 1 : dim(matrix)[1]) {
+  v <- matrix[i, ]
+  if(condition1(v)){
+    allThirteen <- c(1:13)
+    notInV <- allThirteen [ ! allThirteen %in% v]
+    matrix1 <- permutations(8, 5, notInV)
+    for (j in 1 : dim(matrix1)[1]) {
+      v1 <- matrix1[j, ]
+      v2 <- c(v, v1)
+      if(condition2(v2)){
+        notInV2 <- allThirteen [ ! allThirteen %in% v2]
+        matrix2 <- permutations(3, 3, notInV2)
+        for (k in 1 : dim(matrix2)[1]) {
+          v3 <- matrix2[k, ]
+          v4 <- c(v2, v3)
+          if(condition3(v4)){
+            print(v4)
+          }
+        }
+      }
+    }
+    
+    
+  }else{
+    next
+  }
+}
+
+```
+
+
+
+
+***
+<h2 dir="RTL">
+مچ گیری
+</h2>
+
+<p dir="RTL">
+میزگردی شامل ۱۶ فرد دروغگو و راستگو تشکیل شده است. هر کسی ادعا میکند دو فرد کنار دستی او دروغگو هستند. چند نفر دروغگو در جمع وجود دارد؟
+</p>
+
+<p dir="RTL">
+میزگرد دیگری شامل ۱۲ نفر فرد راستگو و دروغگو تشکیل شده به طوری که هر فرد ادعا میکند از میان دو نفر کنار دستی یک نفر راستگو و یک نفر دروغگو هستند. چند نفر دروغگو در جمع وجود دارد؟
+</p>
+
+<p dir="RTL">
+این دفعه میزگردی هشت نفره تشکیل شده به گونه ایی که چهار نفر ادعا میکنند از از میان دو نفر کنار دستی یکی دروغگو و دیگری راستگوست و چهار نفر دیگر اعلام میکنند که هر دو فرد کنار دستی آنها دروغگو هستند. چند نفر دروغگو در میان جمع است؟
+</p>
+***
+<h3 dir="RTL">
+قسمت اول :
+</h3>
+```{r}
+makeRedix2 <- function(i) {
+  a = rep(0, times = 16)
+  for (j in 16:1) {
+    if(i >= 2){
+      a[j] <- i%%2
+      i <- floor(i/2)
+    }else{
+      a[j] <- i
+      break
+    }
+    
+    
+  }
+  return(a)
+}
+
+out <- c()
+for (i in 0:2^16 - 1 ) {
+  b <- TRUE
+  a = makeRedix2(i)
+  if( (a[1] == 0 & !(a[16] == 1 & a[2] == 1)) |
+      (a[1] == 1 & a[16] == 1 & a[2] == 1)){
+    next
+  }
+  if((a[16] == 0 & !(a[1] == 1 & a[15] == 1)) |
+      (a[16] == 1 & a[1] == 1 & a[15] == 1)){
+    next
+  }
+  
+  for (j in 2:15) {
+    if( (a[j] == 0 & !(a[j - 1] == 1 & a[j + 1] == 1)) | 
+      (a[j] == 1 &  a[j - 1] == 1 & a[j + 1] == 1)){
+      b <- FALSE
+      break
+    }
+  }
+  if(b == TRUE){
+    sum = 0
+    for (i in 1:16) {
+      if(a[i] == 1)
+        sum <- sum + 1
+    }
+    if(! sum %in% out){
+      out <- c(out, sum)
+    }
+  }
+}
+print(out)
+
+```
+
+<h3 dir="RTL">
+قسمت دوم :
+</h3>
+```{r}
+makeRedix2twelve <- function(i) {
+  a = rep(0, times = 12)
+  for (j in 12:1) {
+    if(i >= 2){
+      a[j] <- i%%2
+      i <- floor(i/2)
+    }else{
+      a[j] <- i
+      break
+    }
+  }
+  return(a)
+}
+
+out2 <- c()
+for (i in (0:((2^12) - 1)) ) {
+  b <- TRUE
+  a = makeRedix2twelve(i)
+  if( a[1] == 0 & ( (a[12] == 0 & a[2] == 0) | 
+                    (a[12] == 1 & a[2] == 1) ) ) {
+    b <- FALSE
+    next
+  }
+  if( a[1] == 1 & !((a[12] == 0 & a[2] == 0) | 
+                    (a[12] == 1 & a[2] == 1))) {
+    b <- FALSE
+    next
+  }
+  
+  if( a[12] == 0 & ((a[11] == 0 & a[1] == 0) | 
+                    (a[11] == 1 & a[1] == 1))) {
+    b <- FALSE
+    next
+  }
+  if( a[12] == 1 & !((a[11] == 0 & a[1] == 0) | 
+                     (a[11] == 1 & a[1] == 1))) {
+    b <- FALSE
+    next
+  }
+  
+  
+  for (j in 2:11) {
+    if( a[j] == 0 & ((a[j - 1] == 0 & a[j + 1] == 0) | 
+                     (a[j - 1] == 1 & a[j + 1] == 1))) {
+      b <- FALSE
+      break
+    }
+    if( a[j] == 1 & !((a[j - 1] == 0 & a[j + 1] == 0) | 
+                     (a[j - 1] == 1 & a[j + 1] == 1))) {
+      b <- FALSE
+      break
+    }
+  }
+  if(b == TRUE){
+    sum = 0
+    for (i in 1:12) {
+      if(a[i] == 1)
+        sum <- sum + 1
+    }
+    if(! sum %in% out2){
+      out2 <- c(out2, sum)
+    }
+  }
+}
+print(out2)
+
+```
+
+
+<h3 dir="RTL">
+قسمت سوم :
+</h3>
+
+```{r}
+makeRedix2eight <- function(i) {
+  a = rep(0, times = 8)
+  for (j in 8:1) {
+    if(i >= 2){
+      a[j] <- i%%2
+      i <- floor(i/2)
+    }else{
+      a[j] <- i
+      break
+    }
+  }
+  return(a)
+}
+
+
+out3 <- c()
+library(gtools)
+for (i  in 0:((2^8) - 1)) {
+  
+  a = makeRedix2eight(i)
+  matrix = combinations(8, 4)
+  for (m in 1:70) {
+    b <- TRUE
+    v = matrix[m,]
+    for (j in 1:8) {
+      k <- (j - 1)
+      if(k == 0){
+        k <- 8
+      }
+      t <- j + 1
+      if(t == 9){
+        t <- 1
+      }
+      if(is.element(j, v)){
+        if(a[j] == 0){
+          if(((a[k] == 0 & a[t] == 0) | 
+              (a[k] == 1 & a[t] == 1))){
+            b <- FALSE
+            break
+          }  
+        } else {
+          if(!((a[k] == 0 & a[t] == 0) | 
+               (a[k] == 1 & a[t] == 1))){
+            b <- FALSE
+            break
+          }
+        } 
+      }else {
+        if(a[j] == 0){
+          if(!(a[k] == 1 & a[t] == 1)){
+            b <- FALSE
+            break
+          }  
+        } else {
+          if(a[k] == 1 & a[t] == 1){
+            b <- FALSE
+            break
+          }
+        } 
+      }
+    }
+    if(b == TRUE){
+      sum = 0
+      for (i in 1:8) {
+        if(a[i] == 1)
+          sum <- sum + 1
+      }
+      if(! sum %in% out3){
+        out3 <- c(out3, sum)
+      }
+    }
+  }
+}
+print(out3)
+```
+
+

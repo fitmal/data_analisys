@@ -1,0 +1,428 @@
+---
+title: "Fourth Week: Hypothesis Testing"
+subtitle: "TIMSS Analysis"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+<h1 dir="RTL"> 
+تمرین سری چهارم: چقدر ریاضی بلدیم و چرا؟
+</h1>
+
+
+> <p dir="RTL"> 
+با استفاده از داده های ارزیابی تیمز ۲۰۱۵ ادعاهای زیر را مورد ارزیابی قراردهید.
+برای هر سوال علاوه بر استدلال آماری که در غالب آزمون فرض تعریف می شود از تصویرسازی مناسب باهر دو ابزار
+ggplot2
+و
+highcharter
+استفاده نمایید.
+به دلخواه به هفت گزاره از موارد زیر پاسخ دهید.
+</p>
+
+***
+```{r, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(highcharter)
+
+school = read_rds("../hw_04/material/data/bcg.rds")    # school background
+student = read_rds("../hw_04/material/data/bsg.rds") # student background
+teacher = read_rds("../hw_04/material/data/btm.rds") # Teacher background
+stresult = read_rds("../hw_04/material/data/bsa.rds") # strudent result
+stt = read_rds("../hw_04/material/data/bst.rds") # student-teacher linkage
+country = read_rds("../hw_04/material/data/bsr.rds") # within-country
+item_information = readxl::read_xlsx("../hw_04/material/T15_G8_ItemInformation.xlsx")
+
+stresult %>% select(idstud, idcntry, 513:517) -> res_math
+res_math %>% 
+  mutate(score = rowMeans(res_math[,3:7])) -> res_math
+```
+<p dir="RTL">
+در res_math به ازای هر دانش آموز معیار موفقیتش را در score داریم که میانگین ۵ نمره ریاضی او است.
+</p>
+
+
+
+<p dir="RTL">
+۱. میران رضایت معلمان در پیشرفت تحصیلی دانش آموزان موثر است.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r}
+stt %>% select(idcntry, idschool, idteach, idgrade, idlink, bsmmat01:bsmmat05) %>%
+  distinct() -> stt2
+stt2 %>% 
+  mutate(score = rowMeans(stt2[, 6:10])) -> stt2
+teacher %>% select(idcntry, idschool, idteach, idgrade, idlink,btbg10b) %>% distinct -> teachers
+
+full_join(stt2, teachers, by = c("idcntry", "idschool", "idgrade", "idlink", "idteach")) %>% 
+  select(satisfying = btbg10b, score) %>% 
+  filter(!is.na(satisfying)) -> stat
+
+aov(formula = satisfying ~ score, data = stat) %>% summary.aov()
+
+
+hcboxplot( x = stat$score,var = stat$satisfying ,outliers = FALSE) %>% 
+  hc_yAxis(title = list(text = "score")) %>% 
+  hc_xAxis(title = list(text = "satisfying")) %>% 
+  hc_add_theme(hc_theme_monokai())
+```
+
+
+***
+
+<p dir="RTL">
+۲. والدینی که تحصیلات بیشتری دارند دارای فرزندان موفق تری می باشند.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r}
+# 1: University or Higher; 2: Post-secondary but not University; 3: Upper Secondary;
+#4: Lower Secondary; 5: Some Primary, Lower Secondary or No School; 6: Don't Know
+student %>% select(bsdgedup, idstud, idcntry) -> stu2
+full_join(stu2, res_math, by = c("idstud", "idcntry")) -> stat2
+#removing don't knows!!
+stat2 %>% filter(bsdgedup != 6) -> stat2
+aov(bsdgedup ~ score, data = stat2) %>% summary.aov()
+```
+<p dir = "RTL">
+بنابراین طبق تست انالیز واریانس مشاهده می کنیم که اگر دانش آموزان را بر حسب تحصیلات خانواده آن ها دسته بندی کنیم توزیع نمره آن ها یکسان نخواهد بود بنابراین می توانیم نتیجه بگیریم که تحصیلات خانواده تاثیر دارد.
+</p>
+
+```{r}
+hcboxplot( x = stat2$score,var = stat2$bsdgedup,outliers = FALSE) %>% 
+  hc_yAxis(title = list(text = "score")) %>% 
+  hc_xAxis(title = list(text = "education level(desc)"))
+```
+
+<p dir = "RTL">
+همانطور که در نمودار هم نوشته شده است سطح تحصیلات که در نمودار مشخص شده است نزولی است و همانطور که در نمودار هم مشخص است دانش آموزانی که خانواده آن ها دارای سطح تحصیلات بیشتر هستند در مجموع بهتر عمل کرده اند.
+</p>
+***
+
+<p dir="RTL">
+۳. امکانات رفاهی در خانه موجب پیشرفت تحصیلی می گردد.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+student %>% select(14:24, idstud, idcntry) -> stu3
+#har chi bishtr bashe yani emkanatesh kamtre chon : yes:1, no:2
+stu3 %>% 
+  mutate(wealth = rowSums(stu3[,1:11])) -> stu3 
+full_join(stu3, res_math, by = c("idstud", "idcntry")) -> stat3
+aov(wealth ~ score, data = stat3) %>% summary.aov()
+
+
+```
+<p dir = "RTL">
+بنابراین طبق تست انالیز واریانس مشاهده می کنیم که اگر دانش آموزان را بر حسب امکانات رفاهی آن ها دسته بندی کنیم توزیع نمره آن ها یکسان نخواهد بود بنابراین می توانیم نتیجه بگیریم که امکانات رفاهی تاثیر دارد.
+</p>
+
+```{r}
+stat3 %>% filter(!is.na(wealth)) %>%  
+  group_by(wealth) %>% 
+  summarise(
+    mean = mean(score)) -> stat3
+ggplot(data = stat3, is.na = T) +
+  geom_bar(aes(x = wealth, y = mean), stat= "identity", color = "yellow", fill = "orange") +
+  scale_x_discrete(limits=c(11:22)) + xlab("wealth(desc)") + ylab("mean of scores")
+
+```
+<p dir = "RTL">
+همانطور که مشخص است میانگین نمرات در این دسته ها متفاوت است و دسته ای که بیشترین امکانات را دارند دارای میانگین بالاتری هستند.
+</p>
+
+***
+
+<p dir="RTL">
+۴. محیط آرام مدرسه نقش مهمی در پیشرفت تحصیلی دارد.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+<p dir="RTL">
+برای این سوال از موارد سوال ۱۶ سوالات دانش آموزان استفاده شده است.
+</p>
+
+
+```{r, message=FALSE, warning=FALSE}
+student %>% select(50:58, idstud, idcntry) -> stu4 
+#har chi bishtr bashe yani bishtr morede khoshunat vaghe shode
+stu4 %>% 
+  mutate(calmness = rowSums(stu4[,1:9])) -> stu4 
+full_join(stu4, res_math, by = c("idstud", "idcntry")) -> stat4
+aov(calmness ~ score, data = stat4) %>% summary.aov()
+```
+
+<p dir = "RTL">
+بنابراین طبق تست انالیز واریانس مشاهده می کنیم که اگر دانش آموزان را بر حسب آرامش آن ها دسته بندی کنیم توزیع نمره آن ها یکسان نخواهد بود بنابراین می توانیم نتیجه بگیریم که آرامش در مدرسه تاثیر دارد.
+</p>
+
+```{r}
+ggplot(stat4) + 
+  geom_jitter(aes(x = calmness, y = score), na.rm = T, alpha = 0.15) +
+  scale_x_continuous(breaks = c(9,36)) +
+  xlab("calmness(desc)")
+```
+
+<p dir = "RTL">
+همانطور که مشخص است هر چه آرامش بیشتر باشد در مجموع نمرات بهتر شده است.
+</p>
+***
+
+<p dir="RTL"> 
+۶. پسران در کاربرد هندسه قوی تر هستند.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+stresult %>% select(538:542,idstud, idcntry, itsex ) -> info6
+info6 %>%
+  mutate(score = rowMeans(info6[,1:5])) -> info6 
+t.test((info6 %>% filter(itsex == 1))$score, (info6 %>% filter(itsex == 2))$score, data = info6)
+
+#itsex, 1:female, 2:male
+info6 %>%
+  ggplot() + geom_boxplot(aes(y = score, x = itsex,group = itsex), na.rm = T) +
+  scale_x_discrete(limits=c("1.0", "2.0"),labels = c("1.0" = "female", "2.0" = "male"))
+#miangin e dokhtra 474, miangin e pesara 479
+
+
+info6 %>%  filter(!is.na(itsex)) -> info6
+
+#itsex, 1:female, 2:male
+ggplot(info6) +
+  geom_density(aes(score)) +
+  facet_wrap(~itsex, nrow = 1)
+```
+
+<p dir="RTL">
+طبق تست عملکرد دختران و پسران یکسان نیست و
+همانطور که مشخص است دختران در مجموع میانگین بهتری دارند.
+</p>
+
+***
+<p dir="RTL"> 
+۷. تغذیه دانش آموزان نقش اساسی در یادگیری آنها دارد. 
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+#bsbg12
+#soal e 12 
+#1 az hame bishtr
+student %>% select(idstud, idcntry, bsbg12) -> stu7
+
+
+full_join(stu7, res_math, by = c("idstud", "idcntry")) -> stat7
+
+aov(bsbg12~score, data = stat7) %>%  summary.aov()
+#dar natije hame eyne ham nistn
+
+```
+```{r, message=FALSE, warning=FALSE}
+stat7 %>% filter(!is.na(bsbg12)) -> stat7
+hcboxplot( x = stat7$score,var = stat7$bsbg12,outliers = FALSE) %>% 
+  hc_yAxis(title = list(text = "score")) %>% 
+  hc_xAxis(title = list(text = "breakfast(1 means every day and 4 means almost never)")) %>% 
+  hc_add_theme(hc_theme_flat())
+
+stat7 %>% 
+  group_by(bsbg12) %>% 
+  summarise(
+    mean = mean(score)) -> stat7
+ggplot(data = stat7, is.na = T) +
+  geom_bar(aes(x = bsbg12, y = mean), stat= "identity", color = "lightslategray", fill = "lightseagreen") +
+  scale_x_discrete(limits=c(1:4)) + 
+  xlab("breakfast(1 means every day and 4 means almost never)") + ylab("mean of scores")
+```
+
+***
+
+
+***
+
+<p dir="RTL"> 
+۹. علت افت تحصیلی عدم مشارکت در کلاس است.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+#soal e 11
+student %>% select(bsbg11, idstud, idcntry) -> stu9
+full_join(stu9, res_math, by = c("idstud", "idcntry")) -> stat9
+aov(bsbg11 ~ score, data = stat9) %>% summary.aov()
+#1 ziad 4 kam
+stat9 %>% filter(!is.na(bsbg11)) %>% 
+  group_by(bsbg11) %>% 
+  summarise(
+    mean = mean(score)
+  ) -> stat_mean9
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+ggplot(stat9) + 
+  geom_jitter(aes(x = bsbg11, y = score), na.rm = T, alpha = 0.05) +
+  scale_x_continuous(breaks = c(1:4)) + 
+  geom_line(data = stat_mean9, aes(x = bsbg11, y = mean), color = "yellow") + 
+  xlab("absence(1 means more than 2)")
+
+```
+
+***
+
+<p dir="RTL"> 
+۱۰. دانش آموزان ایرانی در استدلال قوی تر از کاربرد هستند.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE, warning=FALSE}
+stresult %>% filter(idcntry == 364) %>% select(568:577) -> info10
+info10 %>% 
+  mutate(score_applying = rowMeans(info10[,1:5]),
+         score_reasoning = rowMeans(info10[,6:10])) -> info10 
+t.test(info10$score_applying, info10$score_reasoning, data = info10)
+
+```
+<p dir="RTL">
+با توجه به مقدار p-value نمی توان نتیجه گرفت که دانش آموزان ایرانی در استدلال قوی تر از کاربرد هستند همچنین میانگین نمرات سوالات استدلالی آن ها و کاربردی آن ها نیز تقریبا برابر است.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+info10 %>% select(score_reasoning, score_applying) -> info10
+gather(info10) ->  info10
+info10 %>% 
+  ggplot() + geom_boxplot(aes(y = value, x = key,group = key), na.rm = T) 
+
+```
+
+***
+
+<p dir="RTL">
+سه گزاره جالب کشف کنید و ادعای خود را ثابت نمایید.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+###########################################gozare aval
+#alaghe dokhtr o pesar ha 
+#moalemaye ba tajrobe tr danesh amuzashun movafagh trn!
+#teacher -> btm , soal e 1
+#max 60
+stt %>% select(idcntry, idschool, idteach, idgrade, idlink, bsmmat01:bsmmat05) %>%
+  distinct() -> sttg1
+sttg1 %>% 
+  mutate(score = rowMeans(sttg1[, 6:10])) -> sttg1
+teacher %>% select(idcntry, idschool, idteach, idgrade, idlink,btbg01) %>% distinct -> teachers
+full_join(sttg1, teachers, by = c("idcntry", "idschool", "idgrade", "idlink", "idteach")) %>% 
+  select(years_of_teaching = btbg01, score) %>% 
+  filter(!is.na(years_of_teaching)) -> statg1
+aov(formula = years_of_teaching ~ score, data = statg1) %>% summary.aov()
+
+statg1 %>% 
+  filter(!is.na(years_of_teaching)) %>% 
+  group_by(years_of_teaching) %>% 
+  summarise(
+    mean = mean(score)
+  ) -> stat_meang1
+
+ggplot(data = stat_meang1, is.na = T) +
+  geom_bar(aes(x = years_of_teaching, y = mean),
+           stat= "identity", color = "lightslategray", fill = "lightseagreen") +
+  scale_x_discrete(limits=c(0:59)) + 
+  xlab("breakfast(1 means every day and 4 means almost never)") + ylab("mean of scores")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1) ) +
+  geom_line(data = stat_meang1, aes(x = years_of_teaching, y = mean), color = "red") 
+
+#ta 50 sal hodudn soudi bude va bad az an nozuli bude
+#va tebghe analize varians tozi ha yeksan nis.
+###########################################gozare dovom
+#sen e moalema va nomre danesh amuza
+#soal e 3 e dade moalema!! 1 az hame kamtr va 6 az hame bishtr
+stt %>% select(idcntry, idschool, idteach, idgrade, idlink, bsmmat01:bsmmat05) %>%
+  distinct() -> sttg2
+sttg2 %>% 
+  mutate(score = rowMeans(sttg2[, 6:10])) -> sttg2
+teacher %>% select(idcntry, idschool, idteach, idgrade, idlink,btbg03) %>% distinct -> teachers
+full_join(sttg2, teachers, by = c("idcntry", "idschool", "idgrade", "idlink", "idteach")) %>% 
+  select(age = btbg03, score) %>% 
+  filter(!is.na(age)) -> statg2
+
+aov(formula = age ~ score, data = statg2) %>% summary.aov()
+#-> moalem ha ba sen haye motefavet natije mokhtalef migirand!
+statg2 %>% 
+  filter(!is.na(age)) %>% 
+  group_by(age) %>% 
+  summarise(
+    mean = mean(score)
+  ) -> stat_meang2
+
+
+ggplot(data = stat_meang2, is.na = T) +
+  geom_bar(aes(x = age, y = mean),
+           stat= "identity", color = "lightslategray", fill = "lightseagreen") +
+  scale_x_discrete(limits=c(1:6)) + 
+  xlab("age of teacher(inc)") + ylab("mean of scores")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1) )
+#banabarin har che sen e moalem bishtar bashad nomarat b tore miangin bishtar bude ast.
+###########################################gozare sevom
+#tasire tedad e danesh amuz ha dar class bar nomre!
+stt %>% select(idcntry, idschool, idteach, idgrade, idlink, bsmmat01:bsmmat05) %>%
+  distinct() -> sttg3
+sttg3 %>% 
+  mutate(score = rowMeans(sttg3[, 6:10])) -> sttg3
+teacher %>% select(idcntry, idschool, idteach, idgrade, idlink,btbg12) %>% distinct -> teachers
+full_join(sttg3, teachers, by = c("idcntry", "idschool", "idgrade", "idlink", "idteach")) %>% 
+  select(number_of_students = btbg12, score) %>% 
+  filter(!is.na(number_of_students)) -> statg3
+
+aov(formula = number_of_students ~ score, data = statg3) %>% summary.aov()
+#-> moalem ha ba tedad danesh amuz haye motefavet natije mokhtalef migirand!
+statg3 %>% 
+  filter(!is.na(number_of_students)) %>% 
+  group_by(number_of_students) %>% 
+  summarise(
+    mean = mean(score)
+  ) -> stat_meang3
+
+
+ggplot(data = stat_meang3, is.na = T) +
+  geom_bar(aes(x = number_of_students, y = mean),
+           stat= "identity", color = "lightslategray", fill = "lightseagreen") +
+  scale_x_discrete(limits=c(1:95)) + 
+  xlab("number of students in class") + ylab("mean of scores")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1) )
+
+#b tor e koli har che tedad e danesh amuzan dar kelas bishtr bashad nomarat payin tr bude ast.
+```
+

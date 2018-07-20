@@ -1,0 +1,288 @@
+---
+title: "Sixth Week: Linear Models"
+subtitle: "House price prediction"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+> <p dir="RTL"> 
+با توجه به داده های قیمت منازل
+لطفا با سوالات زیر پاسخ دهید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. ماتریس همبستگی متغیرهای مختلف را به دست آورده و سپس رسم نمایید.
+اعداد به دست آمده را با آزمون فرض معناداری همبستگی بسنجید و سپس ده متغیری که همبستگی بالاتری با قیمت دارند را مشخص نمایید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+library(tidyverse)
+library(reshape2)
+house = read_csv("../../house/house/train.csv")
+cor(house[sapply(house, is.numeric)], use = "complete.obs") -> cor_matrix
+melted_cor_matrix <- melt(cor_matrix)
+ggplot(data = melted_cor_matrix, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() + theme(axis.text.x = element_text(angle = 60, hjust = 0.5, vjust = 0.6))
+
+library(Hmisc)
+res <- rcorr(as.matrix(house[sapply(house, is.numeric)] ))
+ress <- res$P
+melted_ress <- melt(ress)
+melted_ress %>% 
+  filter(Var1 == "SalePrice")
+
+as.data.frame(melted_cor_matrix) -> melted_cor_matrix
+melted_cor_matrix %>% 
+  filter(Var1 == "SalePrice") %>% 
+  mutate(cor_abs = abs(value)) %>% 
+  arrange(desc(cor_abs)) %>% 
+  slice(-1) %>% 
+  slice(1:10) %>% 
+  .$Var2 -> price_predictor
+
+price_predictor
+
+```
+<p dir="RTL">
+در ress مقدار p-value برای تست کوریلیشن دو به دو پارامترها آمده است.
+اگر برای قیمت و ۱۰ پارامتری که بیشترین کوریلیشن را با قیمت دارند چک کنیم مقدار p-value کم است.
+همچنین در price_predictor ۱۰ پارامتری که بیشترین کوریلیشن را با قیمت دارند آمده است.
+</p>
+***
+
+<p dir="RTL">
+۲. در یک تصویر نمودار پراکنش دو به دو ده متغیر بدست آمده به همراه قیمت را رسم نمایید و هم خطی بودن متغیرها را بررسی کنید
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+library(car)
+house[, c(as.character(price_predictor), "SalePrice")] -> d2
+scatterplotMatrix(d2)
+
+```
+
+***
+
+<p dir="RTL">
+۳. یک مدل خطی بر اساس ده متغیر برای پیش بینی قیمت برازش دهید. و سپس خلاصه نتایج مدل را به دست آورید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r}
+house %>% 
+  rename(firstFlrSF = "1stFlrSF" ) -> house
+fit = lm(SalePrice ~OverallQual + GrLivArea + GarageCars+ GarageArea + TotalBsmtSF +
+           firstFlrSF + FullBath + TotRmsAbvGrd + YearBuilt + YearRemodAdd,
+         data = house)
+summary(fit)
+```
+
+
+***
+
+<p dir="RTL">
+۴. نمودار قیمت واقعی و قیمت پیش بینی را رسم نمایید و خوب بودن مدل را ارزیابی کنید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+
+fitted(fit) -> predicted_price
+house %>% select(SalePrice) -> real_house
+
+cbind(predicted_price, real_house) -> d4
+ggplot(data = d4) + geom_point(aes(x = SalePrice, y = predicted_price)) +
+  geom_abline(slope = 1, intercept = 0, color = "yellow")
+```
+
+<p dir="RTL">
+در این نمودار هر چه نمودار شبیه تر به y = x باشد نمودار بهتری است.
+</p>
+***
+
+<p dir="RTL">
+۵. مقدار
+R-squared
+ مدل را به دست آورید. آیا بر اساس این کمیت مدل به خوبی به داده ها برازش داده شده است؟
+ کمیت
+ F-statistic
+ را در خلاصه مدل تفسیر نمایید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+<p dir="RTL">
+مقدار R-squared برابر با ۰.۷۷است که مقدار بدی نیست.
+زیرا هر چه این مقدار به ۱ نزدیک تر باشد بهتر است.
+هم چنین  p-value برای f-statistic برابر با 2.2e-16 می شود.
+بنابراین مدل از حالتی که همه ضرایب برابر با ۰ باشند بهتر است.
+</p>
+
+***
+
+<p dir="RTL">
+۶. بر اساس
+p-value
+ سطح معناداری ضرایب تصمیم بگیرید که چه متغیرهایی در مدل سازی استفاده شود.
+بر اساس متغیرهای جدید دوباره مدل سازی کنید و نتایج رو گزارش دهید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+fit = lm(SalePrice ~OverallQual + GrLivArea + GarageCars+ TotalBsmtSF +
+           firstFlrSF + FullBath  + YearBuilt + YearRemodAdd,
+         data = house)
+summary(fit)
+fitted(fit) -> predicted2_price
+
+cbind(predicted2_price, house %>% select(SalePrice)) -> d6
+ggplot(data = d6) + geom_point(aes(x = SalePrice, y = predicted2_price)) +
+  geom_abline(slope = 1, intercept = 0, color = "red")
+
+```
+
+<p dir = "RTL">
+متغیرهای GarageArea و TotRmsAbvGrd را حذف می کنیم زیرا به نظر می رسد رگرسور های خوبی نیستند.
+(زیرا p-value آن ها زیاد است.)
+اگر دوباره به R-squared و f-statistic نگاه کنیم باز هم مقادیر آن ها خوب است.
+و در این حالت مقدار value پارامتر f-statistic افزایش می یابد.
+</p>
+***
+
+<p dir="RTL">
+۷. مدل خود را بر اساس باقی مانده نقص یابی کنید.
+سه محک 
+normality, independance, Constant Variance
+ را در نقص یابی خود در نظر بگیرید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+<p dir="RTL">
+برای چک کردن نرمال بودن از نمودار زیر استفاده می کنیم.
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+car::qqPlot(fit, id.method="identify",
+            simulate = TRUE, main="Q-Q Plot")
+```
+<p dir="RTL">
+طبق نمودار به نظر می رسد که نرمال است.
+</p>
+
+```{r, message=FALSE}
+par(mfrow=c(2,2))
+plot(fit)
+```
+<p dir="RTL">
+طبق نمودار بالا چپ و پایین چپ واریانس ثابت نیست زیرا اگر واریانس ثابت بود باید توزیع در راستای x یکسان می بود و خط قرمز خطی افقی می بود.
+</p>
+
+```{r, message=FALSE}
+acf(fit$residuals)
+library(lawstat)
+runs.test(fit$residuals)
+durbinWatsonTest(fit)
+
+```
+
+<p dir = "RTL">
+طبق نمودار به نظر می رسد که مستقل هستند. هم چنین ۲ تست دیگر هم دارای p-value بالایی هستند که به معنای استقلال است.
+</p>
+***
+
+<p dir="RTL">
+۸. داده ها را به پنج قسمت تقسیم کنید. بر اساس چهار قسمت مدل خطی را بسازید و صحت مدل را برای یک قسمت 
+باقی مانده را تست کنید. خطای پیش بینی شما چقدر است؟
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+```{r}
+index = sample(x= 1:nrow(house),size = 0.8*nrow(house),replace = F)
+train = house[index,] 
+test =  house[-index,]
+model_lm = lm(SalePrice ~(OverallQual) + (GrLivArea) + GarageCars+ (TotalBsmtSF) +
+                firstFlrSF + FullBath  + YearBuilt + YearRemodAdd,
+              data = train)
+# prediction
+train$prediction = predict( model_lm, newdata = train, type = "response" )
+test$prediction  = predict( model_lm, newdata = test , type = "response" )
+
+test %>% 
+  mutate(residual_square = (prediction - SalePrice)^2) -> test_residual
+residual = mean(test_residual$residual_square)
+residual
+```
+
+
+***
+
+<p dir="RTL"> 
+۹. آیا قیمت ربط غیر خطی با یکی از ده متغیر استفاده شده دارد؟
+بر اساس دستاوردهای خود مدل را بهتر نمایید.
+</p>
+
+<h3 dir="RTL">
+پاسخ :
+</h3>
+
+<p dir="RTL">
+با استفاده از روش آزمون و خطا و اندازه گیری خطا و با استفاده از رسم نمودار هایی مانند نمودار زیر به فرمول زیر می رسیم.
+</p>
+```{r, message=FALSE, warning=FALSE}
+ggplot(house, mapping = aes(y = SalePrice, x =  OverallQual)) +
+  geom_point() +
+  geom_smooth() 
+```
+<p dir="RTL">
+فرمول:
+model_lm = lm(SalePrice ~I(OverallQual^1.5) + I(GrLivArea^2) + GarageCars+ I(TotalBsmtSF^2) +
+                firstFlrSF + FullBath  + YearBuilt + YearRemodAdd,
+              data = house)
+</p>
+***
+
+<p dir="RTL"> 
+۱۰. بر اساس مدل نهایی به دست آمده نتایج پیش بینی خود را بر روی
+test.csv
+به دست آورید و در سایت 
+kaggle
+ در مسابقه 
+ House Prices: Advanced Regression Techniques
+بارگذاری نمایید. سپس لینک رتبه و عدد آن را ضمیمه تمرین کنید.
+</p>
+
+<p dir="RTL">
+فایل عکس موجود است . و اکانت به نام fitmal است.
+</p>
+

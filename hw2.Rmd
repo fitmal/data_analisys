@@ -1,0 +1,380 @@
+---
+title: "second week: Introduction to R and Rstudio"
+subtitle: "Mobile Data"
+author: "95107188"
+date: "`r Sys.time()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+<h1 dir="RTL"> 
+تمرین سری دوم: تلفن همراه شناسی!
+</h1>
+
+> <p dir="RTL"> 
+ با استفاده از داده های گوشی های همراه به سوالات زیر پاسخ دهید. 
+برای رسم نمودار از پکیج 
+ggplot2
+استفاده کنید.
+</p>
+
+***
+
+<p dir="RTL">
+۱. کدام شرکت بیشترین تعداد گوشی را تولید کرده است؟
+نمودار ستونی ۲۰ شرکت برتر بر حسب تعداد گوشی تولید کرده را رسم کنید.
+</p>
+***
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r, message=FALSE}
+library(ggthemes)
+library(ggplot2)
+library(readr)
+mobile = read_csv("~/term4/data analiys/week_2/hw/answer2/mobile_data.csv")
+library(dplyr)
+
+mobile %>% 
+  group_by(company) %>% 
+  summarise(
+    cntMobile = sum(company == company) , 
+    na.rm = T
+  ) %>% 
+  arrange(desc(cntMobile)) %>% 
+  slice(1:20) -> ans
+  
+ggplot(data = ans) + 
+  geom_bar(mapping = aes(x = reorder(company, -cntMobile), y = cntMobile), stat = "identity",
+           fill = "cyan4", color = "cyan4") +
+  xlab("company") + ylab("number of products") + theme_linedraw() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+```
+<p dir="RTL">
+همانطور که از نمودار مشخص است شرکت سامسونگ بیشترین تعداد گوشی را دارد.
+</p>
+
+***
+
+<p dir="RTL">
+۲. نمودار زمانی طول عرض  ضخامت و کیفیت دوربین گوشی ها را بکشید
+ و به نمودار هر یک مدل خطی اضافه کنید.
+</p>
+
+***
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+***
+<p dir = "RTL">
+در نمودار های زیر به دلیل نشان دادن ازدحام داده در بعضی از قسمت ها از alpha با مقدار کم استفاده شده است.
+</p>
+***
+
+```{r, message=FALSE, warning=FALSE}
+p = ggplot(data = mobile, aes(x = year, y = dim_length)) 
+coef = coef(lm(dim_length ~ year, data = mobile))
+p + geom_point(size = 4, alpha = 0.1, color = "black") + 
+  geom_smooth(method = "lm", color = "red") +
+  ylab("length") +
+  scale_x_continuous(breaks = 1994:2017) + theme_stata() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+p = ggplot(data = mobile, aes(x = year, y = dim_breadth)) 
+coef = coef(lm(dim_breadth ~ year, data = mobile))
+p + geom_point(size = 4, alpha = 0.2) +
+  geom_smooth(method = "lm", color = "red") +
+  ylab("width") +
+  scale_x_continuous(breaks = 1994:2017) + theme_stata() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+
+```{r, message=FALSE, warning=FALSE}
+p = ggplot(data = mobile, aes(x = year, y = dim_thickness)) 
+coef = coef(lm(dim_thickness ~ year, data = mobile))
+p + geom_point(size = 4, alpha = 0.1) +
+  geom_smooth(method = "lm", color = "red") + 
+  ylab("thickness") + 
+  scale_x_continuous(breaks = 1994:2017) +
+  theme_stata() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+p = ggplot(data = mobile, aes(x = year, y = cam_px)) 
+coef = coef(lm(cam_px ~ year, data = mobile))
+p + geom_point(size = 4, alpha = 0.2) +
+  geom_smooth(method = "lm", color = "red") + 
+  ylab("pixel of camera") +
+  scale_x_continuous(breaks = 1994:2017) +
+  theme_stata() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+
+
+<p dir="RTL">
+۳. نمودار ستونی متوسط قیمت گوشی بر حسب تعداد سیم کارت و دسترسی به 
+LTE
+را رسم نمایید.
+</p>
+
+***
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+***
+```{r}
+mobile %>% 
+  group_by(LTE, sim_no) %>% 
+  summarise(price_mean = round(mean(price, na.rm = T), 2)) -> ans3
+
+ggplot(data = ans3) +
+  geom_bar(mapping = aes(x = sim_no, y = price_mean, fill = LTE),
+  position = "dodge", stat = "identity") +
+  xlab("number of sim") +
+  ylab("mean of price")
+
+```
+
+<p dir="RTL">
+۴. نمودار جعبه ایی ضحامت گوشی هایی که در سال ۲۰۱۷ معرفی شده اند را برحسب اینکه کمیت جک هدفون رسم نمایید
+</p>
+
+***
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+***
+```{r, warning=FALSE}
+mobile %>% 
+  filter(year == 2017) -> stat4
+
+ggplot(data = stat4) + geom_boxplot(aes(audio_jack ,dim_thickness)) +
+  xlab("audio jack") + 
+  ylab("thickness") +
+  theme_economist()
+```
+
+
+
+<p dir="RTL">
+۵. مفهوم 
+ppi 
+را در گوشی های موبایل محاسبه و هیستوگرام آن را رسم نمایید.
+همچنین نمودار سالانه متوسط این کمیت را بکشید.
+کدام گوشی بیشترین
+ppi
+را دارد؟
+</p>
+
+
+***
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+***
+<p dir="RTL">
+برای هر دستگاه با استفاده از فرمول زیر ppi را محاسبه می کنیم.
+</p>
+$$ppi = \frac{px\_row}{(display\_size / (  \sqrt{( ((px\_col/px\_row)^2) + 1  )}  )  )}$$
+<p dir = "RTL">
+(مخرج نشان دهنده اندازه ردیف است و با استفاده از فیثاغورث محاسبه می شود.)
+</p>
+
+```{r, message=FALSE, warning=FALSE}
+mobile %>% 
+  mutate(ppi =  (px_row/(display_size / (  sqrt( ((px_col/px_row)^2) + 1  )  )  )  )  )->
+  stat5
+
+ggplot(data = stat5) + geom_histogram( binwidth = 20, aes(x = ppi),
+  color = "orange", fill = "orangered2") +
+  theme_light()
+
+
+mobile$year <- as.integer(mobile$year)
+stat5 %>% 
+  group_by(year) %>% 
+  mutate(mean_ppi = mean(ppi, na.rm = T)) %>% 
+  ggplot(aes(x = year, y = mean_ppi)) + geom_point(color = "orange", size = 3) +
+  geom_line() +
+  ylab("mean of ppi")
+```
+
+***
+
+<p dir="RTL">
+۶. در گذشته به بعضی از مدل های گوشی نوکیا 
+**گوشکوب**
+گفته می شد. سعی کنید برای این مفهوم کمیتی مناسب تعریف کنید .
+ ده گوشکوب برتر را پیدا کرده و نمودار گوشکوبیت آن را رسم نمایید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r}
+mobile %>% 
+  mutate(
+    Sthickness = dim_thickness*80,
+    SaspectRow = (1/(aspect_row * px_row))*300000,
+    Sos = (ifelse(is.na(os_type), 1000, 0)),
+    Sram = (ifelse(is.na(ram), 1000, 0)),
+    Scpu = (ifelse(is.na(cpu), 1000, 0)),
+    Scam = (ifelse(is.na(cam_px), 1000, 0))
+  ) %>% 
+  mutate(score = Sthickness + SaspectRow + Sos + Sram + Scpu + Scam) -> stat6
+stat6 %>% 
+  arrange(desc(score)) %>%
+  slice(1:10) %>% 
+  ggplot() + geom_bar(mapping = aes(x = reorder(device, -score), y = score),
+                      stat = "identity", width = 0.5, fill = "plum4") +
+  xlab("دستگاه") + ylab("گوشکوبیت")  +
+  theme_economist() +  
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+```
+<p dir = "RTL">
+کمیت گوشکوبیت تحت عنوان score در کدهای بالا محاسبه شده است.
+</p>
+
+***
+
+<p dir="RTL">
+۷. آیا تلفن همراهی وجود دارد که در آب غرق نشود؟
+اگر جواب بله هست تمام گوشی های که این خاصیت را دارند بیابید.
+با کشیدن یک نمودار به این سوال پاسخ دهید.
+</p>
+
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+<p dir = "RTL">
+برای پاسخ به این سوال چگالی هر گوشی را براساس کیلوگرم بر مترمکعب محاسبه می کنیم و اگر کمتر از ۱۰۰۰ باشد بر روی آب می ایستد.
+</p>
+```{r, message=FALSE, warning=FALSE}
+mobile %>% 
+  mutate(density = (1000^2)*weight/(dim_length * dim_breadth * dim_thickness )) %>% 
+  ggplot() + geom_histogram(aes(density), na.rm = T, bin= 50) +
+  xlim(500, 2500) + xlab("density(kg/m^3)") + 
+  geom_vline(xintercept = 1000, size = 1, color = "cyan")
+  
+  
+```
+
+***
+
+<p dir="RTL">
+۸. نمودار پراکنش حجم ذخیره سازی باطری و وزن را رسم نمایید.
+میزان همبستگی بین این دو کمیت را محاسبه کنید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+
+```{r}
+ggplot(mobile) + geom_point(mapping = aes(x = battery_mah , y = weight), na.rm = T)
+
+cor(mobile$weight, mobile$battery_mah, use = "complete.obs")
+
+```
+
+***
+
+<p dir="RTL">
+۹. قیمت پرچمداران یک برند خاص مثلا سامسونگ را بیابید و نمودار قیمت زمان و نام مدل را رسم نمایید.
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+```{r}
+mobile %>% 
+  filter(company == "Apple") %>% 
+  group_by(year) %>% 
+  slice(which.max(price)) %>% 
+  ggplot(aes(x = year, y = price, color = device)) +
+  geom_point(na.rm = T, size = 4) +
+  geom_line(col = "black", na.rm = T) +
+  scale_x_continuous(breaks = c(2007 : 2017)) +
+  theme_fivethirtyeight()+
+  theme(axis.title = element_text(angle = 0, vjust = -0.075, size = 15, face = "bold"))
+```
+
+***
+
+<p dir="RTL">
+۱۰. سه نمودار جالب رسم کنید و توضیح دهید چرا از نظر شما جالب است؟
+</p>
+
+<h3 dir = "RTL">
+پاسخ :
+</h3>
+
+<h4 dir = "RTL">
+نمودار اول :
+</h4>
+
+<p dir = "RTL">
+نمودار اول تغییر وزن بر اساس زمان را نشان می دهد و از این نظر جالب است که به نظر می رسد که این نمودار باید نزولی باشد اما این چنین نیست.
+</p>
+
+```{r}
+mobile %>% 
+  ggplot() + geom_point(mapping = aes(x = year, y = weight),
+                        na.rm = T, alpha = 0.7) +
+  scale_x_continuous(breaks = c(1994:2017)) +
+  theme_economist() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=3))
+```
+<h4 dir = "RTL">
+نمودار دوم :
+</h4>
+
+<p dir = "RTL">
+نمودار دوم تغییر قیمت بر اساس زمان را نشان می دهد و از این نظر جالب است که به نظر می رسد باید صعودی باشدو اختلاف زیاد  اما این چنین نیست.
+</p>
+
+```{r, warning=FALSE, message=FALSE}
+mobile %>% 
+  ggplot(mapping = aes(x = year, y = price)) + geom_point(position = "jitter", 
+                        na.rm = T, alpha = 0.7, color = "yellow") +
+  geom_smooth(color = "black", method = "lm", se = FALSE, na.rm = T) +
+  xlim(2000, 2016) + ylim(0,5000) + theme_economist()
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=3))
+```
+
+<h4 dir = "RTL">
+نمودار سوم :
+</h4>
+
+<p dir = "RTL">
+به راحتی از جیب در میاد!
+در این نمودار نشان می دهیم که چند درصد از گوشی ها از جیب های به نسبت کوچیک هم به راحتی در میان. 
+جیب با ابعاد ۱۰*۷!
+</p>
+
+```{r, warning=FALSE}
+mobile %>%
+  group_by(year) %>% summarise(
+    cnt = n(),
+    jibi = sum(na.rm = T, dim_breadth < 70 & dim_length < 100)
+  ) %>% ggplot() + 
+  geom_point(aes(x = year, y = jibi/cnt * 100)) + 
+  ylab("درصد از جیب در اومدن")  +   xlab("سال") + theme_economist()
+```
+
